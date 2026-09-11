@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Send,
-  Sparkles,
   Bot,
   User,
   CheckCircle2,
@@ -52,10 +51,15 @@ function AssistantContent() {
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string>('')
   const [messages, setMessages] = useState<UIConversationItem[]>([])
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior,
+      })
+    }
   }
 
   useEffect(() => {
@@ -174,12 +178,12 @@ function AssistantContent() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <div className="flex flex-col h-[calc(100dvh-5.25rem)] max-w-5xl mx-auto w-full px-4 sm:px-6 py-4 overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-700 text-white flex items-center justify-center shadow-xs">
-            <Sparkles className="w-5 h-5 text-blue-100" />
+            <Bot className="w-5 h-5 text-blue-100" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -202,7 +206,7 @@ function AssistantContent() {
             <button
               type="button"
               onClick={handleClearSession}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset Chat</span>
@@ -212,7 +216,7 @@ function AssistantContent() {
       </div>
 
       {/* Context Scope Indicator */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+      <div className="shrink-0 my-2.5 flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-slate-700 uppercase tracking-wider text-[10px]">Active Scope:</span>
           {activeProjectId ? (
@@ -239,15 +243,15 @@ function AssistantContent() {
           <button
             type="button"
             onClick={() => setActiveProjectId('')}
-            className="text-[11px] font-medium text-slate-500 hover:text-slate-800 underline"
+            className="text-[11px] font-medium text-slate-500 hover:text-slate-800 underline cursor-pointer"
           >
             Switch to Portfolio Scope
           </button>
         )}
       </div>
 
-      {/* Chat History Area */}
-      <div className="space-y-4 min-h-[380px]">
+      {/* Chat History Area (Internally Scrollable) */}
+      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
         {messages.length === 0 ? (
           /* Empty state with starter prompts */
           <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 text-center space-y-6 shadow-2xs">
@@ -297,7 +301,7 @@ function AssistantContent() {
             >
               {item.role === 'assistant' && (
                 <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                  <Sparkles className="w-4 h-4 text-blue-100" />
+                  <Bot className="w-4 h-4 text-blue-100" />
                 </div>
               )}
 
@@ -407,7 +411,7 @@ function AssistantContent() {
         {loading && (
           <div className="flex gap-3 items-start">
             <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <Sparkles className="w-4 h-4 text-blue-100 animate-spin" />
+              <Bot className="w-4 h-4 text-blue-100 animate-pulse" />
             </div>
             <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs text-xs text-slate-500 font-medium flex items-center gap-2">
               <div className="flex space-x-1">
@@ -420,11 +424,12 @@ function AssistantContent() {
           </div>
         )}
 
-        <div ref={messagesEndRef} />
+        <div className="h-2" />
       </div>
 
       {/* Chat Input Bar */}
-      <div className="sticky bottom-4 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-300 p-2.5 shadow-lg space-y-2">
+      <div className="shrink-0 pt-2 pb-1">
+        <div className="bg-white rounded-2xl border border-slate-300 p-2.5 shadow-md space-y-2">
         <div className="relative flex items-end gap-2">
           <textarea
             value={inputMessage}
@@ -450,9 +455,10 @@ function AssistantContent() {
           </button>
         </div>
 
-        <div className="flex items-center justify-between px-2 text-[11px] text-slate-400">
-          <span>Press <kbd className="font-mono bg-slate-100 px-1 py-0.5 rounded border border-slate-200">Enter</kbd> to send</span>
-          <span>SIH 2026 PRAGATI Prototype</span>
+          <div className="flex items-center justify-between px-2 text-[11px] text-slate-400">
+            <span>Press <kbd className="font-mono bg-slate-100 px-1 py-0.5 rounded border border-slate-200">Enter</kbd> to send</span>
+            <span>SIH 2026 PRAGATI Prototype</span>
+          </div>
         </div>
       </div>
     </div>

@@ -199,4 +199,22 @@ describe('PRAGATI Project Intelligence Assistant Suite', () => {
     const audits = conversationStore.getAuditLogs(10)
     assert.ok(audits.some((a) => a.conversationId === 'test_session_1'))
   })
+
+  // 10. PRAGATI Definition & Platform Understanding
+  it('10. Accurately answers what PRAGATI means and describes platform capabilities', async () => {
+    // Check system prompt has PRAGATI context
+    assert.ok(PRAGATI_SYSTEM_PROMPT.includes('About PRAGATI'))
+    assert.ok(PRAGATI_SYSTEM_PROMPT.includes('Pro-Active Governance And Timely Implementation'))
+    assert.ok(PRAGATI_SYSTEM_PROMPT.includes('Predictive Infrastructure Monitoring & Analytics'))
+
+    // Check Mock provider responds with rich explanation
+    const context = await ContextBuilder.buildContext('What does PRAGATI mean?')
+    const response = await provider.generateResponse('What does PRAGATI mean?', PRAGATI_SYSTEM_PROMPT, context)
+
+    assert.ok(response.answer.includes('Pro-Active Governance And Timely Implementation'))
+    assert.ok(response.answer.includes('Predictive Infrastructure Monitoring & Analytics'))
+    assert.ok(response.evidence.some((e) => e.includes('850 infrastructure projects')))
+    assert.ok(response.model_signals.some((m) => m.includes('Dual-Target ML')))
+    assert.ok(response.recommendations.length >= 2)
+  })
 })

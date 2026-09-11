@@ -10,7 +10,7 @@ import {
   AlertTriangle,
   Flame,
   Clock,
-  Sparkles,
+  Bot,
 } from 'lucide-react'
 import { RiskBadge, RiskTier } from '@/components/ui/RiskBadge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
@@ -263,7 +263,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             href={`/dashboard/assistant?projectId=${encodeURIComponent(project.projectId)}`}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all"
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            <Bot className="w-3.5 h-3.5 text-indigo-600" />
             <span>Ask PRAGATI about this project &rarr;</span>
           </Link>
 
@@ -489,7 +489,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       <div className="bg-linear-to-r from-indigo-50/70 to-blue-50/70 border border-indigo-200/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-indigo-100/80 text-indigo-700">
-            <Sparkles className="w-4 h-4" />
+            <Bot className="w-4 h-4" />
           </div>
           <div>
             <h3 className="text-xs font-bold text-slate-900">

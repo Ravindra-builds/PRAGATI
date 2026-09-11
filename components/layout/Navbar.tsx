@@ -13,7 +13,7 @@ import {
   Menu,
   X,
   Compass,
-  Sparkles,
+  Bot,
 } from 'lucide-react'
 
 interface NavLinkItem {
@@ -58,7 +58,7 @@ export function Navbar() {
     {
       href: '/dashboard/assistant',
       label: 'AI Assistant',
-      icon: Sparkles,
+      icon: Bot,
       active: pathname.startsWith('/dashboard/assistant'),
     },
   ]

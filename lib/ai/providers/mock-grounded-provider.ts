@@ -20,7 +20,49 @@ export class MockGroundedProvider implements LLMProvider {
   ): Promise<AssistantResponse> {
     void _history
     void _systemPrompt
-    void prompt
+
+    const lowerPrompt = (prompt || '').toLowerCase()
+    const isAskingAboutPragati =
+      lowerPrompt.includes('what is pragati') ||
+      lowerPrompt.includes('what does pragati mean') ||
+      lowerPrompt.includes('pragati mean') ||
+      lowerPrompt.includes('about pragati') ||
+      lowerPrompt.includes('explain pragati') ||
+      lowerPrompt.includes('who is pragati') ||
+      lowerPrompt.includes('what is this platform') ||
+      (lowerPrompt.includes('what') && lowerPrompt.includes('pragati')) ||
+      (lowerPrompt.includes('meaning') && lowerPrompt.includes('pragati'))
+
+    if (isAskingAboutPragati) {
+      return {
+        answer:
+          'PRAGATI stands for "Pro-Active Governance And Timely Implementation" (in national institutional governance) and represents "Predictive Infrastructure Monitoring & Analytics" in this SIH 2026 platform. It is an AI-powered early warning and decision-support system designed to forecast cost escalations and schedule delays across major national infrastructure projects before compounding delays occur.',
+        evidence: [
+          'Dual Meaning: "Pro-Active Governance And Timely Implementation" (institutional program) / "Predictive Infrastructure Monitoring & Analytics" (SIH 2026 system).',
+          'Standards Alignment: Modeled after MoSPI PAIMANA (Project Assessment, Information Management & Analytics) and OCMS monitoring conventions.',
+          'Portfolio Scope: Monitors 850 infrastructure projects across Roads & Highways, Railways, Urban Development, Energy, and Water Resources.',
+          'Observation-Time Telemetry: Tracks physical progress %, financial progress %, cumulative expenditure, and milestone delivery status.',
+        ],
+        model_signals: [
+          'Dual-Target ML: Calibrated Logistic Regression for Cost Overrun Risk and Random Forest for Schedule Delay Risk.',
+          'Local SHAP Explainability: Explains every prediction using feature attributions (expenditure burn gaps, schedule-progress slippages, milestone delays).',
+          'Strict Anti-Leakage Quarantine: Post-completion actual outcomes are excluded during observation-time inference.',
+        ],
+        recommendations: [
+          'Review the Portfolio Dashboard for macro KPIs, risk distribution tiers, and real-time alert feeds.',
+          'Search specific projects in the Projects Directory or inspect a Project Dossier with SHAP drivers.',
+          'Triage critical milestone slippage and expenditure burn anomalies in the Early Warning Center (Alerts).',
+          'Analyze sector distributions and compare projects side-by-side in Portfolio Analytics.',
+        ],
+        limitations: [
+          'Currently operating in prototype demonstration mode with verified synthetic monitoring telemetry.',
+          'Unrecorded external factors such as contractual litigation or adverse weather events are not captured in snapshot telemetry.',
+          'All predictions and recommendations are advisory decision-support signals intended to assist monitoring authorities.',
+        ],
+        intent: 'GENERAL',
+      }
+    }
+
     switch (context.type) {
       case 'PROJECT': {
         const p = context.data

@@ -40,13 +40,25 @@ export async function POST(request: NextRequest) {
     // 3. Obtain configured LLM provider
     const provider = ProviderFactory.getProvider()
 
-    // 4. Generate structured grounded response
-    const assistantResponse = await provider.generateResponse(
-      message,
-      PRAGATI_SYSTEM_PROMPT,
-      groundedContext,
-      history || session.messages
-    )
+    // 4. Generate structured grounded response (with fallback to MockGroundedProvider on external API failure)
+    let assistantResponse
+    try {
+      assistantResponse = await provider.generateResponse(
+        message,
+        PRAGATI_SYSTEM_PROMPT,
+        groundedContext,
+        history || session.messages
+      )
+    } catch (llmError) {
+      console.warn(`Provider [${provider.name}] encountered an error. Falling back to MockGroundedProvider:`, llmError)
+      const fallbackProvider = ProviderFactory.getProvider('mock')
+      assistantResponse = await fallbackProvider.generateResponse(
+        message,
+        PRAGATI_SYSTEM_PROMPT,
+        groundedContext,
+        history || session.messages
+      )
+    }
 
     // 5. Update session and audit trail
     conversationStore.addMessage(session.id, { role: 'user', content: message })

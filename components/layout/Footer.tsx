@@ -1,8 +1,17 @@
+'use client'
+
 import React from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Building2, Shield, Info, ExternalLink } from 'lucide-react'
 
 export function Footer() {
+  const pathname = usePathname()
+
+  // Remove footer entirely from the dedicated AI assistant chat page
+  if (pathname?.startsWith('/dashboard/assistant')) {
+    return null
+  }
   return (
     <footer className="mt-auto border-t border-slate-200 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
