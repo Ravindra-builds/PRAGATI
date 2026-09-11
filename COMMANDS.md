@@ -400,24 +400,24 @@ Run all automated unit tests using Python's built-in `unittest` runner:
 
 ```powershell
 # Run from repository root
-.\ml\.venv\Scripts\python.exe -m unittest discover -s ml/tests
+.\ml\.venv\Scripts\python.exe -m unittest discover -s ml/tests -v
 ```
-*(Or if venv is active: `python -m unittest discover -s ml/tests`)*
+*(Or if venv is active: `python -m unittest discover -s ml/tests -v`)*
 
-- **What it does**: Executes all 15 automated unit tests across:
+- **What it does**: Executes all 26 automated unit tests across:
   - `test_environment.py`: Verifies imports, config paths, and synthetic data validation.
   - `test_features_pipeline.py`: Verifies feature formulas, zero-division protection, target quarantine, and train/test project disjointness.
   - `test_model_pipeline.py`: Verifies model artifact loading, metadata integrity, and inference probability ranges.
-- **When to use**: Before committing any Python code changes.
+  - `test_api.py`: Verifies FastAPI lifespan startup, `/health`, `/model-info`, `/predict`, input bounds validation, cross-field rules, and strict leakage prevention (`422 Unprocessable Entity`).
+- **When to use**: Before committing any Python or API code changes.
 - **Expected output**:
   ```text
-  ...............
   ----------------------------------------------------------------------
-  Ran 15 tests in 0.961s
+  Ran 26 tests in 1.00s
 
   OK
   ```
-- **What passing tests mean**: All mathematical formulas, anti-leakage quarantines, and model files are mathematically sound and functioning as designed.
+- **What passing tests mean**: All mathematical formulas, anti-leakage quarantines, model serialization pipelines, and API validation boundaries are functioning as designed.
 
 ---
 
@@ -449,13 +449,107 @@ npm run lint
 
 # 11. Backend / ML Service Commands
 
-> [!NOTE]
-> ### PLANNED — Backend / ML Service
-> FastAPI or standalone microservice endpoints have **not yet been implemented** in this phase. The model currently operates via direct Python library imports.
->
-> When the inference service is implemented in future tasks, this section will document:
-> - `uvicorn ml.service.main:app --reload` (Start inference server)
-> - `curl -X POST http://localhost:8000/predict` (Test inference endpoint)
+The ML inference microservice is built using **FastAPI** and **Uvicorn**, serving real-time early-warning predictions for infrastructure projects.
+
+### Start ML Inference Service (Local Development)
+```powershell
+# Run from repository root
+.\ml\.venv\Scripts\python.exe -m uvicorn ml.api.main:app --reload --port 8000
+```
+*(Or if venv is active: `uvicorn ml.api.main:app --reload --port 8000`)*
+
+- **What it does**: Starts the FastAPI ASGI server on `http://127.0.0.1:8000`. Deserializes both model pipelines (`cost_overrun` and `time_overrun`) into memory **once** during startup lifespan.
+- **Interactive Documentation**:
+  - Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+  - ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **How to stop**: Press `Ctrl + C` in the terminal.
+
+---
+
+### Test Service Health
+```powershell
+curl http://localhost:8000/health
+```
+- **Expected response (`200 OK`)**:
+  ```json
+  {"status":"healthy","service":"ml-inference","models_loaded":true}
+  ```
+
+---
+
+### Inspect Model Metadata
+```powershell
+curl http://localhost:8000/model-info
+```
+- **Expected response (`200 OK`)**: Returns active model architectures, decision thresholds (0.50), test set metrics (accuracy, ROC-AUC, PR-AUC), and top predictive features.
+
+---
+
+### Test Real-Time Prediction Endpoint
+```powershell
+curl -X POST http://localhost:8000/predict `
+  -H "Content-Type: application/json" `
+  -d '{
+    "project_id": "PRJ-0714",
+    "snapshot_month": "2025-06",
+    "ministry": "Ministry of Housing and Urban Affairs",
+    "sector": "Urban Development",
+    "implementing_agency": "NBCC",
+    "state": "Madhya Pradesh",
+    "original_cost_cr": 1200.0,
+    "planned_duration_months": 27,
+    "elapsed_months": 22,
+    "physical_progress_pct": 47.6,
+    "financial_progress_pct": 63.6,
+    "expenditure_cr": 763.0,
+    "milestones_total": 6,
+    "milestones_delayed": 2,
+    "project_status": "Critical"
+  }'
+```
+- **Expected response (`200 OK`)**:
+  ```json
+  {
+    "project_id": "PRJ-0714",
+    "cost_overrun": {"probability": 0.9993, "prediction": 1, "risk_level": "HIGH"},
+    "time_overrun": {"probability": 0.9285, "prediction": 1, "risk_level": "HIGH"}
+  }
+  ```
+
+---
+
+### Verify Anti-Leakage Protection
+The API strictly forbids post-completion outcome fields (`final_cost_cr`, `actual_duration_months`, `cost_overrun`, `time_overrun`). Submitting any forbidden field produces an immediate HTTP 422:
+```powershell
+curl -X POST http://localhost:8000/predict `
+  -H "Content-Type: application/json" `
+  -d '{
+    "project_id": "PRJ-0714",
+    "snapshot_month": "2025-06",
+    "ministry": "Ministry of Housing and Urban Affairs",
+    "sector": "Urban Development",
+    "implementing_agency": "NBCC",
+    "state": "Madhya Pradesh",
+    "original_cost_cr": 1200.0,
+    "planned_duration_months": 27,
+    "elapsed_months": 22,
+    "physical_progress_pct": 47.6,
+    "financial_progress_pct": 63.6,
+    "expenditure_cr": 763.0,
+    "milestones_total": 6,
+    "milestones_delayed": 2,
+    "project_status": "Critical",
+    "final_cost_cr": 1400.0
+  }'
+```
+- **Expected response (`422 Unprocessable Entity`)**:
+  ```json
+  {
+    "error": "Validation Error",
+    "message": "The request payload failed schema validation or contained forbidden outcome fields.",
+    "details": [{"field": "body -> final_cost_cr", "message": "Extra inputs are not permitted", "type": "extra_forbidden"}]
+  }
+  ```
 
 ---
 
@@ -507,10 +601,11 @@ Before telling teammates "the project works" or opening a pull request, run thro
 | :--- | :--- | :--- |
 | **1. Python Environment** | `python scripts/verify_env.py` | `SUCCESS: All packages and paths verified` |
 | **2. Dataset Health** | `python ml/src/validate_dataset.py` | `ALL VALIDATION CHECKS PASSED` |
-| **3. ML Unit Tests** | `python -m unittest discover -s ml/tests` | `Ran 15 tests ... OK` |
-| **4. Model Inference** | `python ml/src/predict_sample.py` | Prints predicted probabilities for 4 test projects |
-| **5. Frontend Build** | `npm run build` | `✓ Compiled successfully in X.Xs` |
-| **6. Git Cleanliness** | `git status` | No unintended binary or `.venv` files untracked |
+| **3. ML Unit Tests** | `python -m unittest discover -s ml/tests -v` | `Ran 26 tests ... OK` |
+| **4. ML Service Health** | `curl http://localhost:8000/health` | `{"status":"healthy","models_loaded":true}` |
+| **5. Model Inference** | `python ml/src/predict_sample.py` | Prints predicted probabilities for 4 test projects |
+| **6. Frontend Build** | `npm run build` | `✓ Compiled successfully in X.Xs` |
+| **7. Git Cleanliness** | `git status` | No unintended binary or `.venv` files untracked |
 
 ---
 
@@ -627,6 +722,7 @@ git status
 | `python ml/src/demo_pipeline.py` | No | No | None (Read-only) | **Zero** (Completely safe) |
 | `python ml/src/train_models.py` | No | **YES** | Overwrites `model.joblib`, `metadata.json`, and reports | **Medium** (Retrains and saves new model weights) |
 | `python ml/src/predict_sample.py` | No | No | None (Read-only inference) | **Zero** (Completely safe) |
+| `uvicorn ml.api.main:app --port 8000` | No | No | None (Stateless inference server) | **Zero** (Completely safe) |
 | `python -m unittest discover -s ml/tests` | No | No | None (Read-only) | **Zero** (Completely safe) |
 | `npm run dev` / `npm run build` | No | No | Overwrites `.next/` cache | **Zero** (Standard web builds) |
 | `git push --force` | No | No | Overwrites remote repository history | **HIGH DANGER** (Never use `--force` unless instructed) |
