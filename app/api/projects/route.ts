@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
       state: searchParams.get('state') || undefined,
       status: searchParams.get('status') || undefined,
       risk: searchParams.get('risk') || undefined,
+      query: searchParams.get('query') || undefined,
       limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined,
       offset: searchParams.get('offset') ? Number(searchParams.get('offset')) : undefined,
     }

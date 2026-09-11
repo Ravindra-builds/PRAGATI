@@ -41,6 +41,7 @@ export async function POST(
       prediction: result.prediction,
       warningsGenerated: result.warnings.length,
       warnings: result.warnings,
+      drivers: result.drivers,
     })
   } catch (error) {
     if (error instanceof MLServiceUnavailableError) {

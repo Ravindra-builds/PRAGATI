@@ -132,6 +132,10 @@ export class PredictionService {
       return {
         prediction: storedPrediction,
         warnings: createdWarnings,
+        drivers: {
+          cost: mlResponse.cost_overrun.drivers || [],
+          time: mlResponse.time_overrun.drivers || [],
+        },
       }
     })
 

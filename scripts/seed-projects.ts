@@ -38,18 +38,43 @@ interface RawSnapshot {
   project_status: string
 }
 
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  result.push(current.trim())
+  return result
+}
+
 function parseCSV(filePath: string): RawSnapshot[] {
   const content = fs.readFileSync(filePath, 'utf-8')
   const lines = content.trim().split(/\r?\n/)
   if (lines.length < 2) return []
 
-  const header = lines[0].split(',').map((h) => h.trim())
+  const header = parseCSVLine(lines[0])
   const rows: RawSnapshot[] = []
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim()
     if (!line) continue
-    const parts = line.split(',')
+    const parts = parseCSVLine(line)
 
     const rowObj: Record<string, string> = {}
     for (let j = 0; j < header.length; j++) {
