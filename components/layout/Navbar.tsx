@@ -2,11 +2,11 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Layers,
-  Building2,
   ShieldCheck,
   BarChart3,
   Bell,
@@ -86,19 +86,26 @@ export function Navbar() {
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 rounded-lg bg-blue-700 text-white flex items-center justify-center font-bold shadow-xs group-hover:bg-blue-800 transition-colors">
-                <Building2 className="w-5 h-5" />
+              <div className="relative w-8 h-10 shrink-0 flex items-center justify-center">
+                <Image
+                  src="/images/emblem.png"
+                  alt="State Emblem of India"
+                  width={32}
+                  height={40}
+                  className="object-contain"
+                  priority
+                />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold tracking-tight text-slate-900">
+              <div className="border-l border-slate-200 pl-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base font-extrabold tracking-tight text-slate-900">
                     PRAGATI
                   </span>
-                  <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 tracking-wider">
-                    SIH 2026 PROTOTYPE
+                  <span className="text-[9px] uppercase font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 tracking-wider">
+                    SIH 2026
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 font-normal leading-none hidden sm:block">
+                <p className="text-[10px] text-slate-500 font-normal leading-tight hidden sm:block">
                   Predictive Infrastructure Monitoring &amp; Analytics
                 </p>
               </div>

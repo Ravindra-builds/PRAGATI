@@ -100,6 +100,24 @@ export function Footer() {
           </p>
         </div>
       </div>
+
+      {/* Institutional National Strip with Skyline Watermark */}
+      <div className="bg-[#1f2d3d] text-slate-300 text-xs py-3 px-4 sm:px-6 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 relative z-10">
+          <p className="font-medium tracking-wide text-center sm:text-left text-[11px] sm:text-xs text-slate-200">
+            Data + AI = Better Decisions &nbsp;|&nbsp; Stronger Projects &nbsp;|&nbsp; A Developed India
+          </p>
+          <div className="hidden sm:block opacity-60 hover:opacity-100 transition-opacity">
+            {/* Skyline graphic */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/skyline.png"
+              alt="India Infrastructure Skyline"
+              className="h-7 object-contain"
+            />
+          </div>
+        </div>
+      </div>
     </footer>
   )
 }
