@@ -147,10 +147,14 @@ async def get_model_info():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Inference"])
-async def predict_overrun(payload: PredictionRequest):
+async def predict_overrun(
+    payload: PredictionRequest,
+    include_explanations: bool = True,
+    top_n: int = 5,
+):
     """
-    Dual-target inference endpoint.
-    Calculates cost overrun probability and time overrun probability for a single project snapshot.
+    Dual-target inference endpoint with local explainability.
+    Calculates cost overrun and time overrun probabilities and extracts top model-supported risk drivers.
     Strictly forbids post-completion outcome fields to guarantee leakage-free prediction.
     """
     if not model_service.is_loaded:
@@ -160,7 +164,11 @@ async def predict_overrun(payload: PredictionRequest):
         )
 
     try:
-        response = model_service.predict(payload)
+        response = model_service.predict(
+            payload,
+            include_explanations=include_explanations,
+            top_n=top_n,
+        )
         return response
     except Exception as e:
         logger.exception("Prediction failed for project %s: %s", payload.project_id, e)

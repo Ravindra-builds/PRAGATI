@@ -19,10 +19,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import config
 import features
+import explain
 from ml.api.schemas import (
     PredictionRequest,
     PredictionResponse,
     TargetPredictionResult,
+    RiskDriver,
     ModelInfoResponse,
     ModelInfoItem,
 )
@@ -32,8 +34,8 @@ logger = logging.getLogger("ml_inference_service")
 
 class ModelService:
     """
-    Singleton service managing in-memory machine learning pipelines.
-    Guarantees models are deserialized only once at startup.
+    Singleton service managing in-memory machine learning pipelines and local SHAP explainers.
+    Guarantees models and explainers are deserialized only once at startup.
     """
 
     def __init__(self):
@@ -41,6 +43,7 @@ class ModelService:
         self.cost_metadata: Optional[Dict[str, Any]] = None
         self.time_pipeline = None
         self.time_metadata: Optional[Dict[str, Any]] = None
+        self.explainer: Optional[explain.ModelExplainer] = None
         self.is_loaded: bool = False
 
     def load_models(self) -> None:
@@ -72,10 +75,13 @@ class ModelService:
             with open(time_meta_path, "r", encoding="utf-8") as f:
                 self.time_metadata = json.load(f)
 
+            # Initialize local SHAP explainer
+            self.explainer = explain.ModelExplainer(self.cost_pipeline, self.time_pipeline)
+
             self.is_loaded = True
             elapsed = (time.perf_counter() - start_time) * 1000
             logger.info(
-                "Successfully loaded models in %.1fms | Cost Model: %s | Time Model: %s",
+                "Successfully loaded models & SHAP explainers in %.1fms | Cost Model: %s | Time Model: %s",
                 elapsed,
                 self.cost_metadata.get("model_type"),
                 self.time_metadata.get("model_type"),
@@ -85,10 +91,15 @@ class ModelService:
             self.is_loaded = False
             raise RuntimeError(f"Failed to load model artifacts: {e}") from e
 
-    def predict(self, request: PredictionRequest) -> PredictionResponse:
+    def predict(
+        self,
+        request: PredictionRequest,
+        include_explanations: bool = True,
+        top_n: int = 5,
+    ) -> PredictionResponse:
         """
         Executes inference for a single project snapshot:
-          Raw Request Payload -> 1-row DataFrame -> Feature Engineering -> Pipeline.predict_proba()
+          Raw Request Payload -> 1-row DataFrame -> Feature Engineering -> Pipeline.predict_proba() -> Local SHAP drivers
         """
         if not self.is_loaded or self.cost_pipeline is None or self.time_pipeline is None:
             raise RuntimeError("Model service is not loaded. Cannot process inference request.")
@@ -115,6 +126,15 @@ class ModelService:
         cost_risk = "HIGH" if cost_pred == 1 else "LOW"
         time_risk = "HIGH" if time_pred == 1 else "LOW"
 
+        # Step 3: Local explainability via SHAP (optional, default enabled)
+        cost_drivers = None
+        time_drivers = None
+        if include_explanations and self.explainer is not None:
+            cost_raw = self.explainer.explain(df_engineered, target="cost_overrun", top_n=top_n)
+            time_raw = self.explainer.explain(df_engineered, target="time_overrun", top_n=top_n)
+            cost_drivers = [RiskDriver(**d) for d in cost_raw]
+            time_drivers = [RiskDriver(**d) for d in time_raw]
+
         latency_ms = (time.perf_counter() - t0) * 1000
         logger.info(
             "Inference completed for project %s in %.2fms | Cost Prob: %.4f (%s) | Time Prob: %.4f (%s)",
@@ -132,11 +152,13 @@ class ModelService:
                 probability=round(cost_prob, 4),
                 prediction=cost_pred,
                 risk_level=cost_risk,
+                drivers=cost_drivers,
             ),
             time_overrun=TargetPredictionResult(
                 probability=round(time_prob, 4),
                 prediction=time_pred,
                 risk_level=time_risk,
+                drivers=time_drivers,
             ),
         )
 

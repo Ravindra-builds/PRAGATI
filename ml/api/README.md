@@ -154,10 +154,14 @@ Provides operational metadata, evaluation metrics, decision thresholds, and top 
 
 ---
 
-### 3. Dual-Target Prediction
+### 3. Dual-Target Prediction with Local Explainability
 `POST /predict`
 
-Computes calibrated probabilities and binary risk assignments for both cost and time overruns.
+Computes calibrated probabilities, binary risk assignments, and top model-supported risk drivers for both cost and time overruns.
+
+**Query Parameters (Optional)**:
+- `include_explanations` (boolean, default: `true`): Whether to compute SHAP feature contributions.
+- `top_n` (integer, default: `5`): Number of strongest drivers to return for each target.
 
 **Request (`application/json`)**:
 ```json
@@ -185,14 +189,60 @@ Computes calibrated probabilities and binary risk assignments for both cost and 
 {
   "project_id": "PRJ-0714",
   "cost_overrun": {
-    "probability": 0.9993,
+    "probability": 0.9016,
     "prediction": 1,
-    "risk_level": "HIGH"
+    "risk_level": "HIGH",
+    "drivers": [
+      {
+        "feature": "schedule_progress_gap",
+        "display_name": "Schedule vs Physical Progress Gap",
+        "value": 33.88,
+        "contribution": 5.8739,
+        "direction": "increases_risk"
+      },
+      {
+        "feature": "budget_utilization_pct",
+        "display_name": "Budget Utilization",
+        "value": 63.58,
+        "contribution": 4.5830,
+        "direction": "increases_risk"
+      },
+      {
+        "feature": "schedule_completion_pct",
+        "display_name": "Schedule Completion Rate",
+        "value": 81.48,
+        "contribution": -3.5366,
+        "direction": "decreases_risk"
+      }
+    ]
   },
   "time_overrun": {
-    "probability": 0.9285,
+    "probability": 0.9151,
     "prediction": 1,
-    "risk_level": "HIGH"
+    "risk_level": "HIGH",
+    "drivers": [
+      {
+        "feature": "schedule_progress_gap",
+        "display_name": "Schedule vs Physical Progress Gap",
+        "value": 33.88,
+        "contribution": 0.1526,
+        "direction": "increases_risk"
+      },
+      {
+        "feature": "project_status_Ongoing",
+        "display_name": "Project Status: Ongoing",
+        "value": "Not Ongoing",
+        "contribution": 0.0910,
+        "direction": "increases_risk"
+      },
+      {
+        "feature": "milestone_slippage_ratio",
+        "display_name": "Milestone Slippage Ratio",
+        "value": 0.33,
+        "contribution": 0.0842,
+        "direction": "increases_risk"
+      }
+    ]
   }
 }
 ```

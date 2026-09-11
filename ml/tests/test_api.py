@@ -105,12 +105,28 @@ class TestMLInferenceAPI(unittest.TestCase):
         self.assertTrue(0.0 <= cost["probability"] <= 1.0)
         self.assertIn(cost["prediction"], [0, 1])
         self.assertIn(cost["risk_level"], ["HIGH", "LOW"])
+        self.assertIsNotNone(cost.get("drivers"))
+        self.assertEqual(len(cost["drivers"]), 5)
+        self.assertIn("feature", cost["drivers"][0])
+        self.assertIn("display_name", cost["drivers"][0])
+        self.assertIn("contribution", cost["drivers"][0])
+        self.assertIn("direction", cost["drivers"][0])
 
         # Validate time prediction
         time_res = data["time_overrun"]
         self.assertTrue(0.0 <= time_res["probability"] <= 1.0)
         self.assertIn(time_res["prediction"], [0, 1])
         self.assertIn(time_res["risk_level"], ["HIGH", "LOW"])
+        self.assertIsNotNone(time_res.get("drivers"))
+        self.assertEqual(len(time_res["drivers"]), 5)
+
+    def test_predict_without_explanations(self):
+        """Test POST /predict?include_explanations=false returns predictions without calculating drivers."""
+        response = self.client.post("/predict?include_explanations=false", json=self.valid_payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsNone(data["cost_overrun"].get("drivers"))
+        self.assertIsNone(data["time_overrun"].get("drivers"))
 
     def test_predict_rejects_leakage_final_cost(self):
         """Ensure post-completion outcome 'final_cost_cr' is rejected with HTTP 422."""

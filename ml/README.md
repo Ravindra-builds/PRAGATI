@@ -2,7 +2,7 @@
 
 Welcome to the Machine Learning workspace for the **SIH 2026 AI-Powered Predictive Analytics & Early Warning System for Infrastructure Project Monitoring**.
 
-This workspace is dedicated to data analysis, model research, and experiment tracking using PAIMANA/OCMS-style infrastructure project tracking data.
+This workspace is dedicated to data analysis, model research, experiment tracking, and local explainability using PAIMANA/OCMS-style infrastructure project tracking data.
 
 ---
 
@@ -14,12 +14,13 @@ This workspace provides an isolated, reproducible environment to:
 - Ingest and validate project monitoring records (both synthetic prototypes and public/official records).
 - Conduct Exploratory Data Analysis (EDA) on key project bottlenecks.
 - Engineer leakage-safe predictive indicators and build preprocessing pipelines.
-- Train predictive machine learning models that assess the probability and scale of project delays and budget overruns.
-- Package lightweight, validated model artifacts that can later be served via backend APIs to dashboard users.
+- Train predictive machine learning models assessing the probability of project delays and budget overruns.
+- Provide local prediction-level explainability (SHAP) attributing risk to specific project drivers.
+- Expose lightweight, validated model artifacts via an ASGI microservice (`ml/api/`) to dashboard backends.
 
 ---
 
-## 2. What Problem the Model Will Solve
+## 2. What Problem the Model Solves
 
 Infrastructure projects frequently suffer from:
 - **Cost Overruns**: Final expenditures significantly exceeding original sanctioned estimates.
@@ -29,17 +30,7 @@ Traditional monitoring identifies delays **after** they have already occurred. T
 
 ---
 
-## 3. Core Machine Learning Concepts Explained
-
-- **Input Features ($X$)**: The known snapshot indicators observable at prediction time (e.g. `physical_progress_pct`, `financial_progress_pct`, `original_cost_cr`, `elapsed_months`, `schedule_progress_gap`, `cost_velocity`).
-- **Target / Label ($y$)**: The future outcome we want the model to predict (`time_overrun` and `cost_overrun`). Crucially, targets are unknown during ongoing project execution and quarantined from $X$.
-- **Training**: The phase where algorithms analyze historical projects, learning patterns between input features and known outcomes to tune internal mathematical parameters.
-- **Testing**: Evaluating the trained model on unseen future/separate projects to objectively measure how accurately it generalizes.
-- **Prediction**: Running new, active project data through the trained model during ongoing monitoring to generate risk scores and early warning flags.
-
----
-
-## 4. End-to-End Pipeline & Current Progress
+## 3. End-to-End Pipeline Progress
 
 ```text
 [x] Dataset (Synthetic Multi-Snapshot PAIMANA Generation)
@@ -63,62 +54,124 @@ Traditional monitoring identifies delays **after** they have already occurred. T
 [x] Validation Strategy (Project-Grouped Temporal Holdout)
        │
        ▼
-[x] Baseline Models (Logistic Regression)
+[x] Model Training & Overfitting Diagnosis (Precision, Recall, F1, ROC-AUC, PR-AUC)
        │
        ▼
-[x] Advanced ML Models (Random Forest & Gradient Boosting)
-       │
-       ▼
-[x] Model Evaluation & Overfitting Diagnosis (Precision, Recall, F1, ROC-AUC, PR-AUC)
-       │
-       ▼
-[x] Explainability (Permutation Feature Importance)
+[x] Global Feature Importance (Permutation Feature Importance)
        │
        ▼
 [x] Saved Model Artifacts (model.joblib + metadata.json)
        │
        ▼
-[ ] Prediction Service (Inference API integration - Next Phase)
+[x] Local Explainability Engine (SHAP TreeExplainer & LinearExplainer)
+       │
+       ▼
+[x] ML Inference Microservice (FastAPI /health, /model-info, /predict with drivers)
 ```
 
 ---
 
-## 5. ML Source Modules (`ml/src/`)
+## 4. Local Explainability & Risk Drivers (SHAP)
 
-- [`config.py`](src/config.py): Centralized paths, random seeds, threshold definitions, and data source abstraction.
-- [`generate_synthetic_data.py`](src/generate_synthetic_data.py): Multi-snapshot synthetic data generator with 5 risk archetypes.
-- [`validate_dataset.py`](src/validate_dataset.py): 10-point data validation suite.
-- [`targets.py`](src/targets.py): Target quarantine module enforcing zero leakage of future outcome variables into $X$.
-- [`features.py`](src/features.py): Feature engineering module computing 7 derived metrics (schedule completion, gaps, slippage ratios, velocities) with zero-division safety.
-- [`preprocessing.py`](src/preprocessing.py): Scikit-learn `ColumnTransformer` (median imputation, `RobustScaler`, `OneHotEncoder`) strictly fitted only on training data.
-- [`split.py`](src/split.py): Project-grouped temporal splitting ensuring projects never overlap across train and test partitions.
-- [`train_models.py`](src/train_models.py): Model training harness, evaluation, overfitting diagnostics, permutation importance, and artifact serialization.
-- [`predict_sample.py`](src/predict_sample.py): Inference demonstration loading saved pipelines and predicting on unseen test projects.
-- [`demo_pipeline.py`](src/demo_pipeline.py): End-to-end demonstration running `raw row -> engineered row -> X, y -> split -> preprocessed matrices`.
+### What is SHAP?
+SHAP (SHapley Additive exPlanations) is a game-theoretic approach to explain the output of any machine learning model. It connects optimal credit allocation with local explanations using the classic Shapley values from cooperative game theory.
+
+### Global Importance vs Local Explanations
+- **Global Feature Importance** (e.g. Permutation Importance in model evaluation): Answers *"What features generally matter most across all infrastructure projects?"*
+  - Example: `budget_utilization_pct` and `schedule_progress_gap` are globally the most influential metrics.
+- **Local Prediction Explanations** (SHAP local attribution): Answers *"Why did THIS specific project snapshot (e.g. PRJ-0714 at Month 22) receive a 99.93% risk score?"*
+  - Example: For PRJ-0714, the model identified that a 33.8% Schedule vs Physical Progress Gap contributed +5.87 to log-odds, while an active Critical status added +0.07.
+
+### Explainers Selected
+1. **Time Overrun Model (`RandomForestClassifier`)**:
+   - Uses `shap.TreeExplainer` directly on the fitted ensemble of 150 decision trees.
+   - Computes exact tree-based Shapley values for positive class 1 (schedule delay).
+2. **Cost Overrun Model (`LogisticRegression`)**:
+   - Uses `shap.LinearExplainer` on the fitted linear model using the preprocessor feature expectation.
+   - Computes exact linear attributions: $\phi_i(x) = w_i \cdot (x_i - E[x_i])$.
+
+### Handling Preprocessing & Human-Readable Mapping
+Because the underlying algorithms receive preprocessed, scaled, and one-hot encoded feature matrices (75 dimensions), `ml/src/explain.py`:
+1. Calculates attributions on the preprocessed representation.
+2. Maps one-hot encoded categorical columns (e.g. `project_status_Critical`) to clean labels (`Project Status: Critical`).
+3. Re-attaches unscaled, human-interpretable observed values (e.g. 33.88% gap, 63.58% utilization) from the raw snapshot.
+4. Identifies directionality:
+   - `increases_risk`: positive contribution pushing probability toward overrun.
+   - `decreases_risk`: negative contribution mitigating overrun risk.
+
+### Non-Causal Framing
+SHAP values represent statistical model associations, not causal proofs. All user-facing text uses:
+> *"Strong model contributor"*
+rather than:
+> *"This factor caused the project to fail."*
 
 ---
 
-## 6. How to Run the Modules
+## 5. Future LLM Boundary Architecture
 
-Activate the virtual environment first:
+The local explainability layer serves as the foundation for the future generative LLM:
+
+```text
+Project Monitoring Snapshot
+           │
+           ▼
+    Trained ML Models
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+Probability   Top SHAP Risk Drivers
+ (99.93%)     (Budget Utilization, Progress Gap, etc.)
+     │           │
+     └─────┬─────┘
+           ▼
+Structured Prediction Object
+{
+  "probability": 0.9993,
+  "risk_level": "HIGH",
+  "drivers": [ ... ]
+}
+           │
+           ▼
+      Future LLM
+           │
+           ▼
+- Grounded Natural-Language Narrative
+- Plain-English Executive Summary
+- Suggested Operational Next Steps
+```
+
+> [!IMPORTANT]
+> **Strict Separation Rule**: The LLM will **never** invent or recalculate risk probabilities. It acts purely as an interpreter and synthesizer, consuming the verified, mathematically grounded predictions and SHAP drivers output by the ML model.
+
+---
+
+## 6. ML Source Modules (`ml/src/`)
+
+- [`config.py`](src/config.py): Centralized paths, seeds, thresholds, and data source abstractions.
+- [`features.py`](src/features.py): Single source of truth for domain feature engineering (7 derived metrics).
+- [`preprocessing.py`](src/preprocessing.py): ColumnTransformer pipeline with RobustScaler and OneHotEncoder.
+- [`explain.py`](src/explain.py): Local SHAP explainability engine (`ModelExplainer`).
+- [`explain_sample.py`](src/explain_sample.py): Terminal demonstration of local explanations on test projects.
+- [`predict_sample.py`](src/predict_sample.py): Sample inference on holdout test projects.
+- [`train_models.py`](src/train_models.py): Model training harness, evaluation, and serialization.
+- [`validate_dataset.py`](src/validate_dataset.py): 10-point automated dataset validation suite.
+
+---
+
+## 7. How to Run
+
+From repository root:
+
 ```powershell
-.\ml\.venv\Scripts\Activate.ps1
+# 1. Run local explanation demo on test projects
+.\ml\.venv\Scripts\python.exe ml/src/explain_sample.py
+
+# 2. Run sample inference
+.\ml\.venv\Scripts\python.exe ml/src/predict_sample.py
+
+# 3. Run all automated ML unit tests (34 tests)
+.\ml\.venv\Scripts\python.exe -m unittest discover -s ml/tests -v
+
+# 4. Start the ML inference service
+.\ml\.venv\Scripts\python.exe -m uvicorn ml.api.main:app --reload --port 8000
 ```
-
-1. **Train & Evaluate All Models**:
-   ```bash
-   python ml/src/train_models.py
-   ```
-2. **Run Sample Inference on Test Projects**:
-   ```bash
-   python ml/src/predict_sample.py
-   ```
-3. **Run Automated Unit Tests (15 Tests)**:
-   ```bash
-   python -m unittest discover -s ml/tests
-   ```
-4. **Run Dataset Validation Suite**:
-   ```bash
-   python ml/src/validate_dataset.py
-   ```
-

@@ -31,11 +31,23 @@ export const PredictPayloadSchema = z.object({
 
 export type PredictPayload = z.infer<typeof PredictPayloadSchema>
 
+// Local feature contribution / risk driver sub-schema
+export const RiskDriverSchema = z.object({
+  feature: z.string(),
+  display_name: z.string(),
+  value: z.union([z.number(), z.string()]).nullable().optional(),
+  contribution: z.number(),
+  direction: z.enum(['increases_risk', 'decreases_risk', 'neutral']),
+})
+
+export type RiskDriver = z.infer<typeof RiskDriverSchema>
+
 // Target prediction response sub-schema
 export const TargetResultSchema = z.object({
   probability: z.number().min(0.0).max(1.0),
   prediction: z.union([z.literal(0), z.literal(1)]),
   risk_level: z.enum(['HIGH', 'LOW']),
+  drivers: z.array(RiskDriverSchema).nullable().optional(),
 })
 
 // Full prediction response schema returned by FastAPI

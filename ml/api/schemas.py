@@ -68,11 +68,24 @@ class PredictionRequest(BaseModel):
         return self
 
 
+from typing import Dict, Any, List, Optional, Union
+
+
+class RiskDriver(BaseModel):
+    """Local feature attribution representing model-supported risk drivers."""
+    feature: str = Field(..., description="Transformed feature key")
+    display_name: str = Field(..., description="Human-readable feature title")
+    value: Optional[Union[float, int, str]] = Field(None, description="Actual unscaled observed value")
+    contribution: float = Field(..., description="Local SHAP attribution score")
+    direction: str = Field(..., description="Directional impact: increases_risk, decreases_risk, or neutral")
+
+
 class TargetPredictionResult(BaseModel):
     """Prediction outcome for an individual target."""
     probability: float = Field(..., description="Estimated overrun probability between 0.00 and 1.00")
     prediction: int = Field(..., description="Binary classification outcome (1 = Overrun, 0 = Within Tolerance)")
     risk_level: str = Field(..., description="Risk tier: HIGH (probability >= threshold) or LOW")
+    drivers: Optional[List[RiskDriver]] = Field(None, description="Ranked top local risk drivers (if requested)")
 
 
 class PredictionResponse(BaseModel):

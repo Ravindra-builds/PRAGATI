@@ -18,3 +18,7 @@ openpyxl>=3.1.0
 # Inference API
 fastapi>=0.115.0
 uvicorn>=0.30.0
+
+# Model Explainability & Interpretability
+shap>=0.52.0
+

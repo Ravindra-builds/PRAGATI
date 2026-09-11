@@ -315,6 +315,17 @@ All synthetic data scripts are located under `ml/src/`.
 
 ---
 
+### Run Local SHAP Model Explanations on Test Projects
+```powershell
+# Run from repository root
+.\ml\.venv\Scripts\python.exe ml/src/explain_sample.py
+```
+- **What it does**: Generates local, prediction-level feature attributions using `TreeExplainer` (Random Forest) and `LinearExplainer` (Logistic Regression), showing the top 5 model-supported risk drivers for both targets on unseen projects.
+- **When to use**: To audit and inspect why a specific project received a particular overrun prediction.
+- **Expected output**: Formatted report ranking top risk contributors with human-readable display names, unscaled observed values, and directional impacts (`increases_risk` / `decreases_risk`).
+
+---
+
 # 6. Model Artifacts
 
 Trained model artifacts live in:
@@ -404,20 +415,21 @@ Run all automated unit tests using Python's built-in `unittest` runner:
 ```
 *(Or if venv is active: `python -m unittest discover -s ml/tests -v`)*
 
-- **What it does**: Executes all 26 automated unit tests across:
+- **What it does**: Executes all 34 automated unit tests across:
   - `test_environment.py`: Verifies imports, config paths, and synthetic data validation.
   - `test_features_pipeline.py`: Verifies feature formulas, zero-division protection, target quarantine, and train/test project disjointness.
   - `test_model_pipeline.py`: Verifies model artifact loading, metadata integrity, and inference probability ranges.
-  - `test_api.py`: Verifies FastAPI lifespan startup, `/health`, `/model-info`, `/predict`, input bounds validation, cross-field rules, and strict leakage prevention (`422 Unprocessable Entity`).
+  - `test_explain.py`: Verifies SHAP TreeExplainer and LinearExplainer attributions, probability invariance, top-N sorting, direction labels, and human-readable feature mappings.
+  - `test_api.py`: Verifies FastAPI lifespan startup, `/health`, `/model-info`, `/predict` (with and without explanations), input bounds validation, cross-field rules, and strict leakage prevention (`422 Unprocessable Entity`).
 - **When to use**: Before committing any Python or API code changes.
 - **Expected output**:
   ```text
   ----------------------------------------------------------------------
-  Ran 26 tests in 1.00s
+  Ran 34 tests in 1.61s
 
   OK
   ```
-- **What passing tests mean**: All mathematical formulas, anti-leakage quarantines, model serialization pipelines, and API validation boundaries are functioning as designed.
+- **What passing tests mean**: All mathematical formulas, anti-leakage quarantines, model serialization pipelines, SHAP explainers, and API validation boundaries are functioning as designed.
 
 ---
 
@@ -662,13 +674,14 @@ Before telling teammates "the project works" or opening a pull request, run thro
 | :--- | :--- | :--- |
 | **1. Python Environment** | `python scripts/verify_env.py` | `SUCCESS: All packages and paths verified` |
 | **2. Dataset Health** | `python ml/src/validate_dataset.py` | `ALL VALIDATION CHECKS PASSED` |
-| **3. ML Unit Tests** | `python -m unittest discover -s ml/tests -v` | `Ran 26 tests ... OK` |
+| **3. ML Unit Tests** | `python -m unittest discover -s ml/tests -v` | `Ran 34 tests ... OK` |
 | **4. ML Service Health** | `curl http://localhost:8000/health` | `{"status":"healthy","models_loaded":true}` |
 | **5. Model Inference** | `python ml/src/predict_sample.py` | Prints predicted probabilities for 4 test projects |
-| **6. Database Client** | `npm run db:generate` | `✔ Generated Prisma Client` |
-| **7. Backend Unit Tests** | `npm run test:backend` | `pass 19 ... fail 0` |
-| **8. Frontend Build** | `npm run build` | `✓ Compiled successfully in X.Xs` |
-| **9. Git Cleanliness** | `git status` | No unintended binary or `.venv` files untracked |
+| **6. Local Explainability** | `python ml/src/explain_sample.py` | Prints SHAP risk drivers for test projects |
+| **7. Database Client** | `npm run db:generate` | `✔ Generated Prisma Client` |
+| **8. Backend Unit Tests** | `npm run test:backend` | `pass 19 ... fail 0` |
+| **9. Frontend Build** | `npm run build` | `✓ Compiled successfully in X.Xs` |
+| **10. Git Cleanliness** | `git status` | No unintended binary or `.venv` files untracked |
 
 ---
 
@@ -785,6 +798,7 @@ git status
 | `python ml/src/demo_pipeline.py` | No | No | None (Read-only) | **Zero** (Completely safe) |
 | `python ml/src/train_models.py` | No | **YES** | Overwrites `model.joblib`, `metadata.json`, and reports | **Medium** (Retrains and saves new model weights) |
 | `python ml/src/predict_sample.py` | No | No | None (Read-only inference) | **Zero** (Completely safe) |
+| `python ml/src/explain_sample.py` | No | No | None (Read-only local explainability) | **Zero** (Completely safe) |
 | `uvicorn ml.api.main:app --port 8000` | No | No | None (Stateless inference server) | **Zero** (Completely safe) |
 | `python -m unittest discover -s ml/tests` | No | No | None (Read-only) | **Zero** (Completely safe) |
 | `npm run dev` / `npm run build` | No | No | Overwrites `.next/` cache | **Zero** (Standard web builds) |
