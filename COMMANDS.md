@@ -17,13 +17,14 @@ This document is written for all team members. Whether you are working on the Ne
 7. [Data Replacement / Adding New Data](#7-data-replacement--adding-new-data)
 8. [ML Testing](#8-ml-testing)
 9. [Frontend / Application Testing](#9-frontend--application-testing)
-10. [Database Commands (PLANNED)](#10-database-commands-planned)
-11. [Backend / ML Service Commands (PLANNED)](#11-backend--ml-service-commands-planned)
-12. [Git Workflow](#12-git-workflow)
-13. [Full Project Verification ("Before Saying It Works")](#13-full-project-verification-before-saying-it-works)
-14. [Retraining Cheat Sheet](#14-retraining-cheat-sheet)
-15. [Troubleshooting & Common Fixes](#15-troubleshooting--common-fixes)
-16. [Command Safety Notes](#16-command-safety-notes)
+10. [Database Commands](#10-database-commands)
+11. [Backend / ML Service Commands](#11-backend--ml-service-commands)
+12. [PRAGATI AI Intelligence Assistant](#12-pragati-ai-intelligence-assistant)
+13. [Git Workflow](#13-git-workflow)
+14. [Full Project Verification ("Before Saying It Works")](#14-full-project-verification-before-saying-it-works)
+15. [Retraining Cheat Sheet](#15-retraining-cheat-sheet)
+16. [Troubleshooting & Common Fixes](#16-troubleshooting--common-fixes)
+17. [Command Safety Notes](#17-command-safety-notes)
 
 ---
 
@@ -181,7 +182,11 @@ npm run lint
 - **`http://localhost:3000/dashboard/projects`**: Projects Directory with search, sector/ministry/state filters, and pagination.
 - **`http://localhost:3000/dashboard/projects/[projectId]`**: Detailed Project Dossier with dual-target ML probabilities, SHAP local risk drivers, physical vs financial indicators, and chronological snapshot history.
 - **`http://localhost:3000/dashboard/alerts`**: Early Warning Center with KPI triage cards, multi-criteria filtering (severity, warning type, sector, project ID), and "Why this warning was generated" evidence modal.
+- **`http://localhost:3000/dashboard/analytics`**: Portfolio Analytics workspace with sector distributions, schedule vs progress scatter plots, and multi-project comparative analysis.
+- **`http://localhost:3000/dashboard/assistant`**: PRAGATI Project Intelligence Assistant workspace for grounded Q&A, risk diagnosis, and comparative telemetry evaluation.
+- **`http://localhost:3000/api/assistant/chat`**: AI Assistant chat API endpoint accepting `{ message, activeProjectId?, conversationId? }`.
 - **`http://localhost:3000/api/alerts`**: Alerts API endpoint supporting multi-criteria filtering and summary statistics.
+- **`http://localhost:3000/api/analytics`**: Analytics API endpoint providing aggregated portfolio metrics.
 
 ---
 
@@ -517,13 +522,15 @@ npm run seed:predictions
 
 ---
 
-### Run Backend & Database Unit Tests
+### Run Backend, Assistant & UI Unit Tests
 ```powershell
 npm run test:backend
 ```
-- **What it does**: Runs all 19 TypeScript backend unit and integration tests covering:
+- **What it does**: Runs all 44 TypeScript backend, assistant, and UI tests covering:
   - Database schema constraints & duplicate protections (`tests/database.test.ts`)
   - ML Client validation & risk engine warning rules (`tests/api.test.ts`)
+  - Grounded AI Assistant reasoning & injection defense (`tests/assistant.test.ts`)
+  - Frontend component smoke tests (`tests/frontend.test.ts`)
   - End-to-end integration inference flow (`tests/integration.test.ts`)
 
 ---
@@ -634,7 +641,60 @@ curl -X POST http://localhost:8000/predict `
 
 ---
 
-# 12. Git Workflow
+# 12. PRAGATI AI Intelligence Assistant
+
+The PRAGATI Project Intelligence Assistant provides grounded natural-language explanations, multi-project comparisons, and advisory review steps strictly tied to model predictions and database telemetry.
+
+### Run AI Assistant Unit Tests
+```powershell
+npx tsx --test tests/assistant.test.ts
+```
+- **What it does**: Runs all 9 assistant tests covering:
+  - Grounded context assembly & project extraction (`PRJ-XXXX`)
+  - Numerical telemetry preservation & probability exactness
+  - Prototype data limitation disclaimers
+  - Advisory verb guardrails (`review`, `investigate`, `audit`)
+  - XML-based prompt injection quarantine defense
+  - Portfolio risk aggregations & multi-project comparisons
+  - Provider factory fallback & in-memory audit store
+- **When to use**: Before committing changes to `lib/ai/` or `/api/assistant/chat`.
+
+---
+
+### Test Assistant API via cURL / PowerShell
+```powershell
+curl -X POST http://localhost:3000/api/assistant/chat `
+  -H "Content-Type: application/json" `
+  -d '{
+    "message": "Why is PRJ-0016 flagged for high risk?",
+    "activeProjectId": "PRJ-0016"
+  }'
+```
+- **Expected response (`200 OK`)**: Returns structured JSON conforming to `AssistantResponse` with `executiveAnswer`, `observedTelemetry`, `modelRiskSignals`, `recommendedActions`, and `limitationsAdvisory`.
+
+---
+
+### Switch LLM Provider
+Set environment variables in `.env`:
+```bash
+# 1. Deterministic Grounded Offline Mock (Default - Zero API Keys Needed)
+LLM_PROVIDER=mock
+
+# 2. Google Gemini (Recommended for Production / Evaluation)
+LLM_PROVIDER=gemini
+GEMINI_API_KEY="your-gemini-api-key"
+LLM_MODEL="gemini-1.5-flash"
+
+# 3. OpenAI-Compatible API (OpenAI, Groq, Ollama)
+LLM_PROVIDER=openai
+OPENAI_API_KEY="your-api-key"
+OPENAI_BASE_URL="https://api.groq.com/openai/v1" # Optional
+LLM_MODEL="llama-3.3-70b-versatile"
+```
+
+---
+
+# 13. Git Workflow
 
 Follow this clean, disciplined workflow when collaborating with teammates.
 
@@ -674,7 +734,7 @@ git push
 
 ---
 
-# 13. Full Project Verification ("Before Saying It Works")
+# 14. Full Project Verification ("Before Saying It Works")
 
 Before telling teammates "the project works" or opening a pull request, run through this verification checklist:
 
@@ -687,13 +747,13 @@ Before telling teammates "the project works" or opening a pull request, run thro
 | **5. Model Inference** | `python ml/src/predict_sample.py` | Prints predicted probabilities for 4 test projects |
 | **6. Local Explainability** | `python ml/src/explain_sample.py` | Prints SHAP risk drivers for test projects |
 | **7. Database Client** | `npm run db:generate` | `✔ Generated Prisma Client` |
-| **8. Backend Unit Tests** | `npm run test:backend` | `pass 19 ... fail 0` |
+| **8. Backend & Assistant Tests** | `npm run test:backend` | `pass 44 ... fail 0` |
 | **9. Frontend Build** | `npm run build` | `✓ Compiled successfully in X.Xs` |
 | **10. Git Cleanliness** | `git status` | No unintended binary or `.venv` files untracked |
 
 ---
 
-# 14. Retraining Cheat Sheet
+# 15. Retraining Cheat Sheet
 
 Use this practical guide to know what to run based on what you changed:
 
@@ -751,7 +811,7 @@ git status
 
 ---
 
-# 15. Troubleshooting & Common Fixes
+# 16. Troubleshooting & Common Fixes
 
 ### 1. `python: command not found` or uses wrong Python
 - **Problem**: Terminal cannot find Python or is using global Python 3.9 instead of `ml/.venv` Python 3.13.
@@ -796,7 +856,7 @@ git status
 
 ---
 
-# 16. Command Safety Notes
+# 17. Command Safety Notes
 
 | Command | Modifies Dataset? | Retrains Models? | Overwrites Files? | Destructive Risk |
 | :--- | :---: | :---: | :---: | :--- |

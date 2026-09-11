@@ -51,6 +51,11 @@ export function Footer() {
                   Early Warning Alerts
                 </Link>
               </li>
+              <li>
+                <Link href="/dashboard/assistant" className="hover:text-blue-700 transition-colors">
+                  AI Intelligence Assistant
+                </Link>
+              </li>
             </ul>
           </div>
 

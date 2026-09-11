@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Compass,
+  Sparkles,
 } from 'lucide-react'
 
 interface NavLinkItem {
@@ -53,6 +54,12 @@ export function Navbar() {
       label: 'Alerts',
       icon: Bell,
       active: pathname.startsWith('/dashboard/alerts'),
+    },
+    {
+      href: '/dashboard/assistant',
+      label: 'AI Assistant',
+      icon: Sparkles,
+      active: pathname.startsWith('/dashboard/assistant'),
     },
   ]
 

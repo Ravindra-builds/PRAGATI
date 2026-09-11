@@ -308,7 +308,7 @@ class SyntheticDatasetService {
       const first = rows[0]
       const last = rows[rows.length - 1]
 
-      const updates: SyntheticProjectUpdate[] = rows.map((r, idx) => ({
+      const updates: SyntheticProjectUpdate[] = rows.map((r) => ({
         id: `upd_${projectId}_${r.snapshot_month}`,
         projectId: r.project_id,
         snapshotMonth: r.snapshot_month,

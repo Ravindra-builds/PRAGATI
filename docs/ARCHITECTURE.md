@@ -11,24 +11,26 @@ This document details the architectural layers, system boundaries, data contract
                                     │
                                     ▼
                          Next.js App Router (UI)
+                 [Dashboard, Alerts, Analytics, Project Detail,
+                     PRAGATI Intelligence Assistant]
                                     │
                                     ▼
                          Next.js Backend API Layer
-                            [app/api/projects/...]
+              [app/api/projects/..., app/api/assistant/chat]
                                     │
-                    ┌───────────────┴───────────────┐
-                    │                               │
-                    ▼                               ▼
-       Application Database (PostgreSQL)    FastAPI ML Inference Service
-            [Prisma ORM Client]                 [ml/api/main.py]
-                    │                               │
-        ┌───────────┴───────────┐                   ▼
-        ▼                       ▼            Saved Model Pipelines
-     projects           project_updates     - Cost Overrun (Logistic Regression)
-        │                       │           - Time Overrun (Random Forest)
-        └───────────┬───────────┘
-                    ▼
-          predictions & warnings
+           ┌────────────────────────┼────────────────────────┐
+           │                        │                        │
+           ▼                        ▼                        ▼
+Application Database (PostgreSQL) FastAPI ML Inference     LLM Provider Layer
+    [Prisma ORM Client]          Service [ml/api/main.py]  [Gemini / OpenAI / Mock]
+           │                        │                        │
+    ┌──────┴──────┐                 ▼                        │
+    ▼             ▼          Saved Model Pipelines           │
+ projects  project_updates   - Cost Overrun (Logistic Reg)   │
+    │             │          - Time Overrun (Random Forest)  │
+    └──────┬──────┘                 │                        │
+           ▼                        ▼                        ▼
+  predictions & warnings    SHAP Feature Drivers    ContextBuilder & Grounding
 ```
 
 ---
@@ -66,6 +68,19 @@ This document details the architectural layers, system boundaries, data contract
   - Deserializes trained pipelines (`model.joblib`) into memory **once** on application startup.
   - Executes feature transformations using the single source of truth: `ml/src/features.py`.
   - Enforces Pydantic `extra="forbid"` to reject any payload containing post-completion outcome data.
+
+### Layer 5: PRAGATI Project Intelligence Assistant Layer (`lib/ai/`, `app/api/assistant/`)
+- **Responsibility**: Grounded natural-language reasoning, multi-project comparison, and advisory monitoring assistance.
+- **Zero-Calculation Rule**: The LLM is **never** the predictive model. All probabilities, risk tiers, and feature attributions originate strictly from the ML inference service and PostgreSQL / synthetic dataset.
+- **Components**:
+  - `ContextBuilder`: Extracts entities (`PRJ-XXXX`, sector comparisons, portfolio aggregations) and assembles quarantined structured payloads (`<untrusted_retrieved_data>`).
+  - `LLMProvider` abstraction: Pluggable provider interface supporting Google Gemini, OpenAI-compatible endpoints (Groq, Ollama, OpenAI), and a deterministic offline `MockGroundedProvider` for zero-dependency development and CI test execution.
+  - `ConversationStore`: Session tracking and audit logging in memory without saving secrets or sensitive credentials.
+  - `Structured AssistantResponse`: Schema-enforced output format categorizing answers into Executive Answer, Observed Telemetry & Evidence, Model-Supported Risk Signals, Recommended Review Actions, and Limitations / Advisory Notes.
+- **Safety & Prompt Injection Defense**:
+  - All database telemetry and ML outputs are quarantined inside XML tags.
+  - System instructions forbid executing procedural commands, overriding safety rules, or treating data text as instructions.
+  - Advisory verb guardrails enforce monitoring actions (`review`, `investigate`, `verify`, `request clarification`, `monitor`) and forbid simulated official government mandates.
 
 ---
 
@@ -111,7 +126,54 @@ This document details the architectural layers, system boundaries, data contract
 
 ---
 
-## 4. Key Architectural Safeguards
+## 4. PRAGATI Intelligence Assistant Grounding Flow
+
+```text
+1. User Query Received
+   POST /api/assistant/chat  { message: "Why is PRJ-0016 at high risk?", activeProjectId: "PRJ-0016" }
+               │
+2. Entity Extraction & Routing
+   ContextBuilder detects:
+   - Target Project: PRJ-0016
+   - Query Type: Single project risk explanation
+               │
+3. Deterministic Grounding Assembly
+   ContextBuilder queries ProjectService:
+   - Project master metadata (sector, ministry, budget, timeline)
+   - Latest monitoring snapshot (progress, expenditure, milestones)
+   - Pre-computed ML predictions & calibrated probabilities
+   - Model-supported SHAP risk drivers & directional impact
+   - Active early warning flags and trigger criteria
+               │
+4. Prompt Injection Containment
+   Data encapsulated in isolated XML block:
+   <untrusted_retrieved_data>
+     { ... structured JSON telemetry & ML outputs ... }
+   </untrusted_retrieved_data>
+               │
+5. LLM Provider Execution (Gemini / OpenAI / Mock)
+   System Prompt enforces:
+   - Zero-Calculation Rule: LLM never computes or alters probabilities
+   - 4-Way Semantic Categorization
+   - Strictly advisory action recommendations
+   - Prototype dataset limitation disclaimer
+               │
+6. Schema Validation & Audit Logging
+   Response parsed into AssistantResponse schema
+   Interaction recorded in ConversationStore (secrets excluded)
+               │
+7. Render Structured Intelligence Card
+   Client UI renders:
+   - Executive Summary
+   - Observed Telemetry & Evidence (table)
+   - Model-Supported Risk Drivers (SHAP bars)
+   - Recommended Review Actions (advisory chips)
+   - System Limitations & Advisory Note
+```
+
+---
+
+## 5. Key Architectural Safeguards
 
 1. **No Duplicate Feature Engineering**:
    Feature math (`budget_utilization_pct`, `schedule_progress_gap`, `burn_gap`, etc.) is calculated exclusively inside Python (`ml/src/features.py`). TypeScript never re-implements model math.
@@ -121,3 +183,9 @@ This document details the architectural layers, system boundaries, data contract
    Project data importing (`npm run seed`) is completely independent from prediction generation (`npm run seed:predictions`). Real/public data can replace synthetic data without rewriting the data layer.
 4. **Hermetic Testing**:
    Backend unit tests mock the ML service and run in sub-second time without requiring external database or ML server daemons.
+5. **Zero-Calculation LLM Boundary**:
+   The LLM assistant is mathematically prohibited from generating predictions, altering probabilities, or diagnosing risk independently of the trained ML models and database telemetry.
+6. **Prompt Injection Quarantine**:
+   All user-supplied text and retrieved database fields are quarantined in `<untrusted_retrieved_data>` tags, with strict system prompt defenses prohibiting code execution, prompt extraction, or role overrides.
+7. **Advisory Recommendation Verbs**:
+   The AI assistant is hardcoded to suggest only institutional oversight and verification actions (`review`, `investigate`, `verify`, `audit`, `clarify`), strictly forbidding imperative administrative orders.
