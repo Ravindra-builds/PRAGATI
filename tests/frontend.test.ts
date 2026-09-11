@@ -12,6 +12,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert'
 import { syntheticDatasetService } from '../lib/services/synthetic-dataset'
+import { projectService } from '../lib/services/project-service'
 import { calculateOverallRisk } from '../lib/risk-engine'
 
 describe('1. Synthetic Dataset Service & Resilience', () => {
@@ -114,6 +115,74 @@ describe('3. Target Outcome Quarantine in Data Services', () => {
       assert.strictEqual((update as any).actual_duration_months, undefined)
       assert.strictEqual((update as any).cost_overrun, undefined)
       assert.strictEqual((update as any).time_overrun, undefined)
+    }
+  })
+})
+
+describe('4. Early Warning Center & Alerts Service', () => {
+  test('retrieves alerts with summary counts and pagination', async () => {
+    const res = await projectService.getAlerts({ limit: 10 })
+    assert.ok(res.total > 0, 'Must have at least one alert')
+    assert.strictEqual(res.alerts.length, Math.min(res.total, 10))
+    assert.ok(res.summary.total >= res.total, 'Summary total must be >= filtered total')
+    assert.ok(res.summary.critical >= 0, 'Critical count must be non-negative')
+    assert.ok(res.summary.high >= 0, 'High count must be non-negative')
+  })
+
+  test('filters alerts by severity accurately', async () => {
+    const criticalRes = await projectService.getAlerts({ severity: 'CRITICAL', limit: 20 })
+    assert.ok(criticalRes.alerts.length > 0, 'Should have critical alerts')
+    for (const a of criticalRes.alerts) {
+      assert.strictEqual(
+        a.severity,
+        'CRITICAL',
+        `Expected severity CRITICAL, got ${a.severity}`
+      )
+    }
+  })
+
+  test('filters alerts by warning type accurately', async () => {
+    const costRes = await projectService.getAlerts({
+      warningType: 'COST_OVERRUN_RISK',
+      limit: 20,
+    })
+    assert.ok(costRes.alerts.length > 0, 'Should have cost overrun alerts')
+    for (const a of costRes.alerts) {
+      assert.strictEqual(
+        a.warningType,
+        'COST_OVERRUN_RISK',
+        `Expected warningType COST_OVERRUN_RISK, got ${a.warningType}`
+      )
+    }
+  })
+
+  test('filters alerts by project ID', async () => {
+    const projectRes = await projectService.getAlerts({
+      projectId: 'PRJ-0001',
+      limit: 10,
+    })
+    assert.ok(projectRes.alerts.length > 0, 'PRJ-0001 should have alerts')
+    for (const a of projectRes.alerts) {
+      assert.strictEqual(a.projectId, 'PRJ-0001')
+      assert.ok(a.project, 'Alert must have project details attached')
+      assert.strictEqual(a.project.projectId, 'PRJ-0001')
+    }
+  })
+
+  test('alert records preserve target outcome quarantine', async () => {
+    const res = await projectService.getAlerts({ limit: 20 })
+    for (const a of res.alerts) {
+      assert.strictEqual((a as any).final_cost_cr, undefined)
+      assert.strictEqual((a as any).actual_duration_months, undefined)
+      assert.strictEqual((a as any).cost_overrun, undefined)
+      assert.strictEqual((a as any).time_overrun, undefined)
+
+      if (a.project) {
+        assert.strictEqual((a.project as any).final_cost_cr, undefined)
+        assert.strictEqual((a.project as any).actual_duration_months, undefined)
+        assert.strictEqual((a.project as any).cost_overrun, undefined)
+        assert.strictEqual((a.project as any).time_overrun, undefined)
+      }
     }
   })
 })

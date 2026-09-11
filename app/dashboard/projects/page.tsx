@@ -4,14 +4,10 @@ import React, { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Search,
-  Filter,
-  Layers,
   ArrowRight,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  ShieldAlert,
 } from 'lucide-react'
 import { RiskBadge, RiskTier } from '@/components/ui/RiskBadge'
 import { TableSkeleton } from '@/components/ui/Skeleton'
@@ -100,8 +96,8 @@ export default function ProjectsDirectoryPage() {
       const data: ProjectsResponse = await res.json()
       setProjects(data.projects || [])
       setTotal(data.total || 0)
-    } catch (err: any) {
-      setError(err.message || 'Error connecting to projects API')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error connecting to projects API')
     } finally {
       setLoading(false)
     }
@@ -131,20 +127,20 @@ export default function ProjectsDirectoryPage() {
   ]
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               National Projects Directory
             </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-mono font-semibold">
-              {total} Monitored Assets
+            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 tracking-wider">
+              SIH Prototype Dataset ({total} Assets)
             </span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Comprehensive catalog of national infrastructure projects with live ML risk scores.
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">
+            Catalog of national infrastructure projects with live ML risk indicators and progress metrics.
           </p>
         </div>
 
@@ -152,25 +148,25 @@ export default function ProjectsDirectoryPage() {
           type="button"
           onClick={() => fetchProjects()}
           disabled={loading}
-          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition-colors"
+          className="self-start sm:self-auto inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-medium rounded-lg text-slate-600 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh List</span>
         </button>
       </div>
 
-      {/* Search & Filter Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+      {/* Lightweight Filter Toolbar: consistent h-9 controls */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2.5">
           {/* Search Input */}
           <div className="md:col-span-5 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID, project title, agency, or state..."
-              className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 focus:bg-white"
+              className="w-full h-9 pl-8 pr-3 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 focus:bg-white"
             />
           </div>
 
@@ -182,7 +178,7 @@ export default function ProjectsDirectoryPage() {
                 setSelectedSector(e.target.value)
                 setPage(1)
               }}
-              className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="w-full h-9 px-2.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
               aria-label="Filter by Sector"
             >
               <option value="ALL">All Sectors</option>
@@ -202,7 +198,7 @@ export default function ProjectsDirectoryPage() {
                 setSelectedRisk(e.target.value)
                 setPage(1)
               }}
-              className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="w-full h-9 px-2.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
               aria-label="Filter by Risk Tier"
             >
               <option value="ALL">All Risk Tiers</option>
@@ -221,7 +217,7 @@ export default function ProjectsDirectoryPage() {
                 setSelectedStatus(e.target.value)
                 setPage(1)
               }}
-              className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="w-full h-9 px-2.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
               aria-label="Filter by Status"
             >
               <option value="ALL">All Statuses</option>
@@ -272,16 +268,16 @@ export default function ProjectsDirectoryPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                    <th className="py-3 px-4">Project ID</th>
-                    <th className="py-3 px-4">Project Name &amp; Agency</th>
-                    <th className="py-3 px-4">Sector</th>
-                    <th className="py-3 px-4">State</th>
-                    <th className="py-3 px-4 text-right">Sanctioned</th>
-                    <th className="py-3 px-4 text-center">Progress (Phy / Fin)</th>
-                    <th className="py-3 px-4 text-center">Risk Tier</th>
-                    <th className="py-3 px-4 text-center">Cost Risk</th>
-                    <th className="py-3 px-4 text-center">Time Risk</th>
-                    <th className="py-3 px-4 text-right">Details</th>
+                    <th className="py-2.5 px-4">Project ID</th>
+                    <th className="py-2.5 px-4">Project Name &amp; Agency</th>
+                    <th className="py-2.5 px-4">Sector</th>
+                    <th className="py-2.5 px-4">State</th>
+                    <th className="py-2.5 px-4 text-right">Sanctioned</th>
+                    <th className="py-2.5 px-4 text-center">Progress (Phy / Fin)</th>
+                    <th className="py-2.5 px-4 text-center">Risk Tier</th>
+                    <th className="py-2.5 px-4 text-center">Cost Risk</th>
+                    <th className="py-2.5 px-4 text-center">Time Risk</th>
+                    <th className="py-2.5 px-4 text-right">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
@@ -298,7 +294,7 @@ export default function ProjectsDirectoryPage() {
                         className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                       >
                         {/* Project ID */}
-                        <td className="py-3 px-4 font-mono font-bold text-blue-700">
+                        <td className="py-2.5 px-4 font-mono font-bold text-blue-700">
                           <Link
                             href={`/dashboard/projects/${proj.projectId}`}
                             className="hover:underline"
@@ -308,7 +304,7 @@ export default function ProjectsDirectoryPage() {
                         </td>
 
                         {/* Title & Agency */}
-                        <td className="py-3 px-4 max-w-xs">
+                        <td className="py-2.5 px-4 max-w-xs">
                           <Link
                             href={`/dashboard/projects/${proj.projectId}`}
                             className="font-medium text-slate-900 group-hover:text-blue-700 transition-colors block truncate"
@@ -316,27 +312,27 @@ export default function ProjectsDirectoryPage() {
                             {proj.name}
                           </Link>
                           <span className="text-[11px] text-slate-500 block truncate">
-                            Agency: {proj.implementingAgency}
+                            {proj.implementingAgency}
                           </span>
                         </td>
 
                         {/* Sector */}
-                        <td className="py-3 px-4 text-slate-700 font-medium">
+                        <td className="py-2.5 px-4 text-slate-700 font-medium">
                           {proj.sector}
                         </td>
 
                         {/* State */}
-                        <td className="py-3 px-4 text-slate-600">
+                        <td className="py-2.5 px-4 text-slate-600">
                           {proj.state}
                         </td>
 
                         {/* Sanctioned Cost */}
-                        <td className="py-3 px-4 text-right font-mono font-medium text-slate-800">
+                        <td className="py-2.5 px-4 text-right font-mono font-medium text-slate-800">
                           ₹{proj.originalCostCr.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr
                         </td>
 
                         {/* Progress */}
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-4 text-center">
                           <div className="inline-flex items-center gap-1.5 font-mono text-[11px]">
                             <span className="text-emerald-700 font-semibold" title="Physical Progress">
                               {phy.toFixed(1)}%
@@ -349,12 +345,12 @@ export default function ProjectsDirectoryPage() {
                         </td>
 
                         {/* Risk Tier */}
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-4 text-center">
                           <RiskBadge level={riskTier as RiskTier} size="sm" />
                         </td>
 
                         {/* Cost Risk */}
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-4 text-center">
                           <span
                             className={`font-mono font-bold ${
                               costProb >= 0.75
@@ -369,7 +365,7 @@ export default function ProjectsDirectoryPage() {
                         </td>
 
                         {/* Time Risk */}
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-4 text-center">
                           <span
                             className={`font-mono font-bold ${
                               timeProb >= 0.75
@@ -384,13 +380,13 @@ export default function ProjectsDirectoryPage() {
                         </td>
 
                         {/* Action Link */}
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-2.5 px-4 text-right">
                           <Link
                             href={`/dashboard/projects/${proj.projectId}`}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900 group-hover:translate-x-0.5 transition-transform"
+                            className="inline-flex items-center gap-1 h-7 px-2.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium text-xs transition-colors border border-blue-200"
                           >
                             <span>Inspect</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
+                            <ArrowRight className="w-3 h-3" />
                           </Link>
                         </td>
                       </tr>
@@ -401,7 +397,7 @@ export default function ProjectsDirectoryPage() {
             </div>
 
             {/* Pagination bar */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+            <div className="p-3.5 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
               <div>
                 Showing{' '}
                 <span className="font-semibold text-slate-800">
@@ -420,7 +416,7 @@ export default function ProjectsDirectoryPage() {
                   type="button"
                   onClick={() => setPage((p) => Math.max(p - 1, 1))}
                   disabled={page <= 1 || loading}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
+                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Previous</span>
@@ -434,7 +430,7 @@ export default function ProjectsDirectoryPage() {
                   type="button"
                   onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
                   disabled={page >= totalPages || loading}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
+                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-3.5 h-3.5" />

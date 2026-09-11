@@ -175,6 +175,14 @@ npm run lint
 - **When to use**: Before opening a pull request.
 - **Expected output**: `✔ No ESLint warnings or errors`.
 
+### PRAGATI Application Routes
+- **`http://localhost:3000/`**: Landing Portal & institutional architecture overview.
+- **`http://localhost:3000/dashboard`**: Portfolio Overview, executive KPI cards, risk distribution, and Early Warning Feed.
+- **`http://localhost:3000/dashboard/projects`**: Projects Directory with search, sector/ministry/state filters, and pagination.
+- **`http://localhost:3000/dashboard/projects/[projectId]`**: Detailed Project Dossier with dual-target ML probabilities, SHAP local risk drivers, physical vs financial indicators, and chronological snapshot history.
+- **`http://localhost:3000/dashboard/alerts`**: Early Warning Center with KPI triage cards, multi-criteria filtering (severity, warning type, sector, project ID), and "Why this warning was generated" evidence modal.
+- **`http://localhost:3000/api/alerts`**: Alerts API endpoint supporting multi-criteria filtering and summary statistics.
+
 ---
 
 # 3. Python / ML Environment

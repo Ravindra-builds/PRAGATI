@@ -1,6 +1,27 @@
 import fs from 'fs'
 import path from 'path'
 
+export interface RawSnapshotRow {
+  project_id: string
+  snapshot_month: string
+  elapsed_months: string
+  physical_progress_pct: string
+  financial_progress_pct: string
+  expenditure_cr: string
+  milestones_total: string
+  milestones_delayed: string
+  project_status: string
+  original_cost_cr: string
+  planned_duration_months: string
+  ministry: string
+  sector: string
+  implementing_agency: string
+  state: string
+  cost_overrun?: string
+  time_overrun?: string
+  [key: string]: string | undefined
+}
+
 export interface SyntheticProjectUpdate {
   id: string
   projectId: string
@@ -28,6 +49,16 @@ export interface SyntheticPrediction {
   createdAt: Date
 }
 
+export interface AlertFilters {
+  severity?: string
+  warningType?: string
+  sector?: string
+  projectId?: string
+  search?: string
+  limit?: number
+  offset?: number
+}
+
 export interface SyntheticWarning {
   id: string
   projectId: string
@@ -36,6 +67,36 @@ export interface SyntheticWarning {
   title: string
   message: string
   createdAt: Date
+  project?: {
+    projectId: string
+    name?: string
+    sector?: string
+    ministry?: string
+    implementingAgency?: string
+    state?: string
+    originalCostCr?: number
+    plannedDurationMonths?: number
+    status?: string
+  }
+  projectUpdate?: {
+    snapshotMonth: string
+    elapsedMonths: number
+    physicalProgressPct: number
+    financialProgressPct: number
+    expenditureCr: number
+    milestonesTotal: number
+    milestonesDelayed: number
+    projectStatus: string
+  }
+  prediction?: {
+    costOverrunProbability: number
+    costPrediction: number
+    timeOverrunProbability: number
+    timePrediction: number
+    overallRiskLevel: string
+    costModelVersion: string
+    timeModelVersion: string
+  }
 }
 
 export interface SyntheticProject {
@@ -107,13 +168,13 @@ class SyntheticDatasetService {
     }
 
     const header = parseCSVLine(lines[0])
-    const rowsByProject = new Map<string, any[]>()
+    const rowsByProject = new Map<string, RawSnapshotRow[]>()
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim()
       if (!line) continue
       const parts = parseCSVLine(line)
-      const row: Record<string, string> = {}
+      const row = {} as RawSnapshotRow
       for (let j = 0; j < header.length; j++) {
         row[header[j]] = parts[j]?.trim() ?? ''
       }
@@ -222,6 +283,17 @@ class SyntheticDatasetService {
           severity: milestoneRatio >= 0.5 ? 'CRITICAL' : 'MEDIUM',
           title: 'Excessive Milestone Slippage',
           message: `${latestUpdate.milestonesDelayed} of ${latestUpdate.milestonesTotal} milestones delayed (${(milestoneRatio * 100).toFixed(0)}%).`,
+          createdAt: new Date(),
+        })
+      }
+      if (burnGap >= 15.0) {
+        warnings.push({
+          id: `warn_burn_${projectId}`,
+          projectId,
+          warningType: 'EXPENDITURE_BURN_ANOMALY',
+          severity: burnGap >= 25.0 ? 'HIGH' : 'MEDIUM',
+          title: 'Disproportionate Financial Burn Rate',
+          message: `Financial utilization (${latestUpdate.financialProgressPct.toFixed(1)}%) leads physical delivery (${latestUpdate.physicalProgressPct.toFixed(1)}%) by ${burnGap.toFixed(1)}%, signaling expenditure without proportional physical progress.`,
           createdAt: new Date(),
         })
       }
@@ -421,6 +493,130 @@ class SyntheticDatasetService {
         sectors: Array.from(distinctSectors).sort(),
         states: Array.from(distinctStates).sort(),
       },
+    }
+  }
+
+  getAlerts(filters: AlertFilters = {}) {
+    this.loadData()
+    const allAlerts: SyntheticWarning[] = []
+
+    for (const p of this.projectsMap!.values()) {
+      for (const w of p.warnings) {
+        allAlerts.push({
+          ...w,
+          project: {
+            projectId: p.projectId,
+            name: p.name,
+            sector: p.sector,
+            ministry: p.ministry,
+            implementingAgency: p.implementingAgency,
+            state: p.state,
+            originalCostCr: p.originalCostCr,
+            plannedDurationMonths: p.plannedDurationMonths,
+            status: p.status,
+          },
+          projectUpdate: p.latestUpdate
+            ? {
+                snapshotMonth: p.latestUpdate.snapshotMonth,
+                elapsedMonths: p.latestUpdate.elapsedMonths,
+                physicalProgressPct: p.latestUpdate.physicalProgressPct,
+                financialProgressPct: p.latestUpdate.financialProgressPct,
+                expenditureCr: p.latestUpdate.expenditureCr,
+                milestonesTotal: p.latestUpdate.milestonesTotal,
+                milestonesDelayed: p.latestUpdate.milestonesDelayed,
+                projectStatus: p.latestUpdate.projectStatus,
+              }
+            : undefined,
+          prediction: p.latestPrediction
+            ? {
+                costOverrunProbability: p.latestPrediction.costOverrunProbability,
+                costPrediction: p.latestPrediction.costPrediction,
+                timeOverrunProbability: p.latestPrediction.timeOverrunProbability,
+                timePrediction: p.latestPrediction.timePrediction,
+                overallRiskLevel: p.latestPrediction.overallRiskLevel,
+                costModelVersion: p.latestPrediction.costModelVersion,
+                timeModelVersion: p.latestPrediction.timeModelVersion,
+              }
+            : undefined,
+        })
+      }
+    }
+
+    // Sort by severity (CRITICAL -> HIGH -> MEDIUM -> LOW), then projectId
+    const severityRank: Record<string, number> = {
+      CRITICAL: 4,
+      HIGH: 3,
+      MEDIUM: 2,
+      LOW: 1,
+    }
+
+    allAlerts.sort((a, b) => {
+      const diff = (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0)
+      if (diff !== 0) return diff
+      return a.projectId.localeCompare(b.projectId)
+    })
+
+    const summary = {
+      total: allAlerts.length,
+      critical: allAlerts.filter((a) => a.severity === 'CRITICAL').length,
+      high: allAlerts.filter((a) => a.severity === 'HIGH').length,
+      medium: allAlerts.filter((a) => a.severity === 'MEDIUM').length,
+      low: allAlerts.filter((a) => a.severity === 'LOW').length,
+      byType: {
+        COST_OVERRUN_RISK: allAlerts.filter((a) => a.warningType === 'COST_OVERRUN_RISK').length,
+        SCHEDULE_DELAY_RISK: allAlerts.filter((a) => a.warningType === 'SCHEDULE_DELAY_RISK').length,
+        CRITICAL_MILESTONE_SLIPPAGE: allAlerts.filter((a) => a.warningType === 'CRITICAL_MILESTONE_SLIPPAGE').length,
+        EXPENDITURE_BURN_ANOMALY: allAlerts.filter((a) => a.warningType === 'EXPENDITURE_BURN_ANOMALY').length,
+      } as Record<string, number>,
+    }
+
+    let filtered = allAlerts
+
+    if (filters.severity && filters.severity !== 'ALL') {
+      const sev = filters.severity.toUpperCase()
+      filtered = filtered.filter((a) => a.severity === sev)
+    }
+
+    if (filters.warningType && filters.warningType !== 'ALL') {
+      filtered = filtered.filter((a) => a.warningType === filters.warningType)
+    }
+
+    if (filters.sector && filters.sector !== 'ALL') {
+      const sec = filters.sector.toLowerCase()
+      filtered = filtered.filter((a) => a.project?.sector?.toLowerCase() === sec)
+    }
+
+    if (filters.projectId && filters.projectId !== 'ALL') {
+      const pid = filters.projectId.toLowerCase()
+      filtered = filtered.filter((a) => a.projectId.toLowerCase() === pid)
+    }
+
+    if (filters.search) {
+      const q = filters.search.toLowerCase().trim()
+      filtered = filtered.filter(
+        (a) =>
+          a.projectId.toLowerCase().includes(q) ||
+          a.title.toLowerCase().includes(q) ||
+          a.message.toLowerCase().includes(q) ||
+          (a.project &&
+            ((a.project.name && a.project.name.toLowerCase().includes(q)) ||
+              (a.project.ministry && a.project.ministry.toLowerCase().includes(q)) ||
+              (a.project.implementingAgency &&
+                a.project.implementingAgency.toLowerCase().includes(q)) ||
+              (a.project.state && a.project.state.toLowerCase().includes(q))))
+      )
+    }
+
+    const limit = Math.min(Math.max(Number(filters.limit) || 20, 1), 100)
+    const offset = Math.max(Number(filters.offset) || 0, 0)
+    const paginated = filtered.slice(offset, offset + limit)
+
+    return {
+      total: filtered.length,
+      limit,
+      offset,
+      alerts: paginated,
+      summary,
     }
   }
 }

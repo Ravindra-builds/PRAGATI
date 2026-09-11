@@ -8,7 +8,9 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
-import { syntheticDatasetService } from './synthetic-dataset'
+import { syntheticDatasetService, AlertFilters } from './synthetic-dataset'
+
+export type { AlertFilters }
 
 export interface ProjectFilters {
   sector?: string
@@ -19,6 +21,59 @@ export interface ProjectFilters {
   query?: string
   limit?: number
   offset?: number
+}
+
+export interface AttentionProjectSummary {
+  id: string
+  projectId: string
+  name: string
+  sector: string
+  ministry: string
+  state: string
+  originalCostCr: number
+  latestUpdate: {
+    id: string
+    projectId: string
+    snapshotMonth: string
+    elapsedMonths: number
+    physicalProgressPct: number
+    financialProgressPct: number
+    expenditureCr: number
+    milestonesTotal: number
+    milestonesDelayed: number
+    projectStatus: string
+    createdAt: Date
+  } | null
+  latestPrediction: {
+    id: string
+    projectId: string
+    projectUpdateId: string
+    costOverrunProbability: number
+    costPrediction: number
+    timeOverrunProbability: number
+    timePrediction: number
+    costModelVersion: string
+    timeModelVersion: string
+    overallRiskLevel: string
+    createdAt: Date
+  } | null
+}
+
+export interface RecentWarningItem {
+  id: string
+  projectId: string
+  projectUpdateId: string | null
+  predictionId: string | null
+  warningType: string
+  severity: string
+  title: string
+  message: string
+  createdAt: Date
+  resolvedAt: Date | null
+  project?: {
+    projectId: string
+    sector: string
+  }
 }
 
 export class ProjectService {
@@ -257,8 +312,8 @@ export class ProjectService {
       }
 
       let totalExpenditureCr = 0
-      const attentionProjects: any[] = []
-      const recentWarnings: any[] = []
+      const attentionProjects: AttentionProjectSummary[] = []
+      const recentWarnings: RecentWarningItem[] = []
 
       for (const p of projects) {
         if (p.updates[0]) {
@@ -315,6 +370,161 @@ export class ProjectService {
       }
     } catch {
       return syntheticDatasetService.getSummary(filters)
+    }
+  }
+
+  /**
+   * Retrieve early warning alerts with filtering by severity, type, sector, project, and search query.
+   */
+  async getAlerts(filters: AlertFilters = {}) {
+    const limit = Math.min(Math.max(Number(filters.limit) || 20, 1), 100)
+    const offset = Math.max(Number(filters.offset) || 0, 0)
+
+    try {
+      const where: Prisma.EarlyWarningWhereInput = {
+        resolvedAt: null,
+      }
+
+      if (filters.severity && filters.severity !== 'ALL') {
+        where.severity = { equals: filters.severity.toUpperCase() }
+      }
+
+      if (filters.warningType && filters.warningType !== 'ALL') {
+        where.warningType = { equals: filters.warningType }
+      }
+
+      if (filters.sector && filters.sector !== 'ALL') {
+        where.project = {
+          sector: { equals: filters.sector, mode: 'insensitive' },
+        }
+      }
+
+      if (filters.projectId && filters.projectId !== 'ALL') {
+        where.projectId = { equals: filters.projectId, mode: 'insensitive' }
+      }
+
+      if (filters.search) {
+        const q = filters.search.trim()
+        where.OR = [
+          { projectId: { contains: q, mode: 'insensitive' } },
+          { title: { contains: q, mode: 'insensitive' } },
+          { message: { contains: q, mode: 'insensitive' } },
+          {
+            project: {
+              OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { ministry: { contains: q, mode: 'insensitive' } },
+                { implementingAgency: { contains: q, mode: 'insensitive' } },
+                { state: { contains: q, mode: 'insensitive' } },
+              ],
+            },
+          },
+        ]
+      }
+
+      // Check count
+      const total = await prisma.earlyWarning.count({ where })
+
+      if (
+        total === 0 &&
+        !filters.search &&
+        !filters.severity &&
+        !filters.warningType &&
+        !filters.sector &&
+        !filters.projectId
+      ) {
+        // Fallback to synthetic if database is empty
+        return syntheticDatasetService.getAlerts(filters)
+      }
+
+      // Query paginated alerts with project, projectUpdate, and prediction
+      const alerts = await prisma.earlyWarning.findMany({
+        where,
+        take: limit,
+        skip: offset,
+        orderBy: [{ createdAt: 'desc' }, { projectId: 'asc' }],
+        include: {
+          project: {
+            select: {
+              id: true,
+              projectId: true,
+              name: true,
+              sector: true,
+              ministry: true,
+              implementingAgency: true,
+              state: true,
+              originalCostCr: true,
+              plannedDurationMonths: true,
+              status: true,
+            },
+          },
+          projectUpdate: {
+            select: {
+              snapshotMonth: true,
+              elapsedMonths: true,
+              physicalProgressPct: true,
+              financialProgressPct: true,
+              expenditureCr: true,
+              milestonesTotal: true,
+              milestonesDelayed: true,
+              projectStatus: true,
+            },
+          },
+          prediction: {
+            select: {
+              costOverrunProbability: true,
+              costPrediction: true,
+              timeOverrunProbability: true,
+              timePrediction: true,
+              overallRiskLevel: true,
+              costModelVersion: true,
+              timeModelVersion: true,
+            },
+          },
+        },
+      })
+
+      // Query summary counts across all active warnings
+      const [totalCount, criticalCount, highCount, mediumCount, lowCount, byTypeRaw] =
+        await Promise.all([
+          prisma.earlyWarning.count({ where: { resolvedAt: null } }),
+          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'CRITICAL' } }),
+          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'HIGH' } }),
+          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'MEDIUM' } }),
+          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'LOW' } }),
+          prisma.earlyWarning.groupBy({
+            by: ['warningType'],
+            where: { resolvedAt: null },
+            _count: { id: true },
+          }),
+        ])
+
+      const byType: Record<string, number> = {
+        COST_OVERRUN_RISK: 0,
+        SCHEDULE_DELAY_RISK: 0,
+        CRITICAL_MILESTONE_SLIPPAGE: 0,
+        EXPENDITURE_BURN_ANOMALY: 0,
+      }
+      for (const item of byTypeRaw) {
+        byType[item.warningType] = item._count.id
+      }
+
+      return {
+        total,
+        limit,
+        offset,
+        alerts,
+        summary: {
+          total: totalCount,
+          critical: criticalCount,
+          high: highCount,
+          medium: mediumCount,
+          low: lowCount,
+          byType,
+        },
+      }
+    } catch {
+      return syntheticDatasetService.getAlerts(filters)
     }
   }
 }

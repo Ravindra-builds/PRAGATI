@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
       success: true,
       data: summary,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const details = err instanceof Error ? err.message : 'Unknown error'
     console.error('Error fetching dashboard summary:', err)
     return NextResponse.json(
       {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
         error: {
           code: 'SUMMARY_FETCH_FAILED',
           message: 'Failed to retrieve portfolio summary.',
-          details: err.message,
+          details,
         },
       },
       { status: 500 }
