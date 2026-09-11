@@ -436,14 +436,75 @@ npm run lint
 
 # 10. Database Commands
 
-> [!NOTE]
-> ### PLANNED — Database
-> Database integration (e.g. PostgreSQL / Prisma / Supabase) has **not yet been implemented** in this phase.
->
-> When database support is added in future tasks, this section will document:
-> - `npx prisma migrate dev` (Run database migrations)
-> - `npx prisma studio` (Interactive database browser)
-> - `python scripts/seed_db.py` (Seed database with project monitoring records)
+The data layer uses **PostgreSQL** managed through **Prisma ORM** (`@prisma/client` and `prisma`).
+
+### Start Local PostgreSQL (Docker)
+```powershell
+docker compose up -d
+```
+- **What it does**: Starts a PostgreSQL 16 Alpine container listening on port `5432` with credentials `postgres:postgres` and database `sih_monitoring`.
+- **How to stop**: `docker compose down`.
+
+---
+
+### Generate Prisma Client
+```powershell
+npm run db:generate
+```
+- **What it does**: Generates strongly-typed TypeScript Prisma Client artifacts into `node_modules/@prisma/client` based on `prisma/schema.prisma`.
+- **When to use**: After modifying `prisma/schema.prisma` or pulling repository updates.
+
+---
+
+### Apply Migrations / Push Schema to PostgreSQL
+```powershell
+# Fast schema sync (ideal for local prototype development)
+npm run db:push
+
+# Or deploy tracked SQL migrations
+npx prisma migrate deploy
+```
+- **What it does**: Creates all required tables (`projects`, `project_updates`, `predictions`, `early_warnings`), foreign keys, and indexes in PostgreSQL.
+
+---
+
+### Open Prisma Studio (Interactive Database GUI)
+```powershell
+npm run db:studio
+```
+- **What it does**: Launches a local web-based database browser on `http://localhost:5555` to inspect and query records visually.
+- **How to stop**: Press `Ctrl + C` in the terminal.
+
+---
+
+### Seed Projects & Monitoring Snapshots
+```powershell
+npm run seed
+```
+- **What it does**: Ingests unique projects and monthly snapshots from `ml/data/synthetic/projects_snapshot.csv` into `projects` and `project_updates`.
+- **Target Quarantine**: Strictly omits post-completion outcome columns (`final_cost_cr`, `actual_duration_months`, `cost_overrun`, `time_overrun`).
+- **Synthetic Flag**: Explicitly sets `is_synthetic: true` on all seeded rows.
+
+---
+
+### Generate Batch Predictions & Warnings
+```powershell
+# Generates predictions for active projects by calling the FastAPI ML service
+npm run seed:predictions
+```
+- **What it does**: Queries projects with active snapshots, calls `POST /predict` on the FastAPI ML service, persists dual-target probabilities into `predictions`, and triggers prototype `early_warnings`.
+- **Note**: Ensure the ML service is running first (`uvicorn ml.api.main:app --port 8000`).
+
+---
+
+### Run Backend & Database Unit Tests
+```powershell
+npm run test:backend
+```
+- **What it does**: Runs all 19 TypeScript backend unit and integration tests covering:
+  - Database schema constraints & duplicate protections (`tests/database.test.ts`)
+  - ML Client validation & risk engine warning rules (`tests/api.test.ts`)
+  - End-to-end integration inference flow (`tests/integration.test.ts`)
 
 ---
 
@@ -604,8 +665,10 @@ Before telling teammates "the project works" or opening a pull request, run thro
 | **3. ML Unit Tests** | `python -m unittest discover -s ml/tests -v` | `Ran 26 tests ... OK` |
 | **4. ML Service Health** | `curl http://localhost:8000/health` | `{"status":"healthy","models_loaded":true}` |
 | **5. Model Inference** | `python ml/src/predict_sample.py` | Prints predicted probabilities for 4 test projects |
-| **6. Frontend Build** | `npm run build` | `✓ Compiled successfully in X.Xs` |
-| **7. Git Cleanliness** | `git status` | No unintended binary or `.venv` files untracked |
+| **6. Database Client** | `npm run db:generate` | `✔ Generated Prisma Client` |
+| **7. Backend Unit Tests** | `npm run test:backend` | `pass 19 ... fail 0` |
+| **8. Frontend Build** | `npm run build` | `✓ Compiled successfully in X.Xs` |
+| **9. Git Cleanliness** | `git status` | No unintended binary or `.venv` files untracked |
 
 ---
 

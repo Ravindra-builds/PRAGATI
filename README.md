@@ -13,12 +13,13 @@ Large-scale infrastructure initiatives often suffer from compounding schedule sl
 ## 2. Current Development Stage
 
 > [!NOTE]
-> **Stage 1: Project Initialization & ML Workspace Setup (Current)**
-> - Next.js TypeScript application structure configured.
-> - Python machine learning environment configured inside `ml/` with minimal, dedicated dependencies.
-> - Dataset schemas and anti-leakage guidelines documented in `ml/DATA_DICTIONARY.md`.
-> - Data-source flexibility architecture established in `ml/src/config.py`.
-> - **Note**: Machine learning models, prediction APIs, databases, dashboards, and LLM features have not been built yet and will be implemented in subsequent phases.
+> **Completed Capabilities:**
+> - **ML Workspace & Pipeline**: Leakage-safe feature engineering, project-grouped temporal holdouts, and trained models (`Logistic Regression` for Cost Overrun, `Random Forest` for Time Overrun).
+> - **ML Inference Microservice**: FastAPI service (`ml/api/main.py`) serving dual-target probability estimates via `/predict` and metadata via `/model-info`.
+> - **PostgreSQL Data Layer**: Relational schema managed via Prisma ORM (`projects`, `project_updates`, `predictions`, `early_warnings`).
+> - **Next.js Backend API Routes**: App Router endpoints for project querying, snapshot history, prediction retrieval, and prediction generation.
+> - **Risk & Early Warning Engine**: Deterministic prototype rule engine evaluating cost escalation, delay trajectories, milestone slippage, and expenditure burn anomalies.
+> - **Testing & Quality**: 26 Python ML unit tests and 19 TypeScript backend unit and integration tests passing.
 
 ---
 
@@ -27,39 +28,49 @@ Large-scale infrastructure initiatives often suffer from compounding schedule sl
 ```text
 sih-infrastructure-monitoring/
 │
-├── app/                      # Next.js App Router (pages, layout, routing)
+├── app/                      # Next.js App Router
+│   ├── api/                  # Backend API routes
+│   │   └── projects/         # Project querying, snapshots, and prediction endpoints
+│   ├── layout.tsx            # Root HTML layout
+│   └── page.tsx              # Application home landing page
+│
 ├── components/               # Reusable frontend UI components
-├── lib/                      # Client & shared utility functions
-├── public/                   # Static web assets & icons
+│
+├── docs/                     # System architecture and design documentation
+│   └── ARCHITECTURE.md       # High-level architecture, layer responsibilities & data flow
+│
+├── lib/                      # Backend services and utilities
+│   ├── db.ts                 # Prisma Client singleton
+│   ├── ml-client.ts          # Dedicated FastAPI ML service client with Zod validation
+│   ├── risk-engine.ts        # Prototype risk scoring and early warning rule triggers
+│   └── services/             # Project and prediction domain services
 │
 ├── ml/                       # Isolated Python Machine Learning Workspace
-│   ├── data/
-│   │   ├── raw/              # Ingested raw datasets (git-ignored)
-│   │   ├── processed/        # Cleaned & feature-engineered data (git-ignored)
-│   │   └── synthetic/        # Synthetic dataset workspace & documentation
-│   ├── notebooks/            # Jupyter notebooks for visual EDA & experiments
-│   ├── src/                  # Core ML source code
-│   │   ├── __init__.py
-│   │   └── config.py         # Configurable paths, random seeds & data sources
-│   ├── models/               # Saved model artifacts & checkpoints (git-ignored)
-│   ├── reports/
-│   │   └── eda/              # EDA visualization plots and summary reports
-│   ├── tests/                # ML test suite
-│   │   ├── __init__.py
-│   │   └── test_environment.py
-│   ├── .venv/                # Python virtual environment (git-ignored)
-│   ├── requirements.txt      # Core data science & ML dependencies
-│   ├── README.md             # ML workspace guide, lifecycle pipeline & concepts
-│   └── DATA_DICTIONARY.md    # Candidate schema, units & anti-leakage rules
+│   ├── api/                  # FastAPI inference microservice (main.py, schemas.py, service.py)
+│   ├── data/                 # Raw, processed, and synthetic datasets
+│   ├── models/               # Serialized pipelines (model.joblib) & metadata (metadata.json)
+│   ├── reports/              # Model comparison, EDA figures, and evaluation reports
+│   ├── src/                  # Core feature engineering, modeling & validation scripts
+│   └── tests/                # ML unit and API test suite (26 passing tests)
 │
-├── docs/                     # Architecture designs and project documentation
-├── scripts/                  # Cross-cutting development and verification scripts
-│   └── verify_env.py         # Environment verification script
+├── prisma/                   # PostgreSQL schema and migrations
+│   ├── schema.prisma         # Relational database models and constraints
+│   └── migrations/           # Tracked PostgreSQL SQL migrations
 │
-├── .gitignore                # Git ignore rules for Next.js and Python artifacts
-├── package.json              # Next.js project configuration and scripts
-├── tsconfig.json             # TypeScript configuration
-└── README.md                 # Project root documentation (this file)
+├── scripts/                  # Development scripts
+│   ├── seed-projects.ts      # Seeds projects and snapshots from synthetic CSV
+│   ├── seed-predictions.ts   # Generates batch predictions via ML service
+│   └── verify_env.py         # Python environment verification
+│
+├── tests/                    # TypeScript backend test suites (19 passing tests)
+│   ├── api.test.ts           # ML client boundary checks and risk rules
+│   ├── database.test.ts      # Schema constraints, duplicate prevention & relationships
+│   └── integration.test.ts   # End-to-end prediction and warning flow
+│
+├── docker-compose.yml        # Local PostgreSQL container configuration
+├── .env.example              # Environment variables template
+├── COMMANDS.md               # Master reference for all developer commands
+└── package.json              # Next.js project configuration and scripts
 ```
 
 ---
@@ -69,78 +80,87 @@ sih-infrastructure-monitoring/
 ### Prerequisites
 - **Node.js**: v18+ (tested on v24.x) & npm
 - **Python**: v3.10+ (tested on v3.13.x)
-- **Git**
+- **PostgreSQL**: Local instance or Docker (`docker compose up -d`)
 
-### A. Next.js Web Application Setup
+---
 
-1. Install frontend dependencies:
+### Step 1: Environment Setup
+Copy the template configuration:
+```bash
+cp .env.example .env
+```
+Ensure `DATABASE_URL` points to your PostgreSQL database and `ML_SERVICE_URL` points to `http://127.0.0.1:8000`.
+
+---
+
+### Step 2: Database Initialization (Prisma & PostgreSQL)
+1. **Start PostgreSQL** (if using Docker):
    ```bash
-   npm install
+   docker compose up -d
    ```
-
-2. Start the local development server:
+2. **Generate Prisma Client**:
    ```bash
-   npm run dev
+   npm run db:generate
    ```
-
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-4. Build for production:
+3. **Push Schema to PostgreSQL**:
    ```bash
-   npm run build
+   npm run db:push
+   ```
+4. **Seed Project Data**:
+   ```bash
+   npm run seed
    ```
 
 ---
 
-### B. Python ML Workspace Setup
-
-The ML workspace lives inside `ml/` and operates in an isolated virtual environment.
-
-1. **Create the Python Virtual Environment** (if not already created):
-   - **Windows (PowerShell / Command Prompt)**:
-     ```bash
-     python -m venv ml/.venv
-     ```
-   - **Linux / macOS**:
-     ```bash
-     python3 -m venv ml/.venv
-     ```
-
-2. **Activate the Virtual Environment**:
-   - **Windows PowerShell**:
-     ```powershell
-     .\ml\.venv\Scripts\Activate.ps1
-     ```
-   - **Windows Command Prompt**:
-     ```cmd
-     ml\.venv\Scripts\activate.bat
-     ```
-   - **Linux / macOS**:
-     ```bash
-     source ml/.venv/bin/activate
-     ```
-
-3. **Install ML Dependencies**:
-   ```bash
-   pip install --upgrade pip
-   pip install -r ml/requirements.txt
-   ```
-
-4. **Verify the ML Environment**:
-   Run the verification script from the repository root:
-   ```bash
-   python scripts/verify_env.py
-   ```
-   Or run the unit tests:
-   ```bash
-   python -m unittest discover -s ml/tests
-   ```
+### Step 3: Start the ML Inference Microservice
+From the repository root (PowerShell):
+```powershell
+.\ml\.venv\Scripts\python.exe -m uvicorn ml.api.main:app --reload --port 8000
+```
+- Interactive docs available at: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
-## 5. Architectural Separation
+### Step 4: Start the Next.js Web Application
+```bash
+npm run dev
+```
+- Access the web application at: [http://localhost:3000](http://localhost:3000)
 
-The Python ML workspace is intentionally decoupled from the web application:
-- **No tight coupling**: Data science experimentation and modeling can evolve without breaking frontend builds.
-- **Configurable Data Source**: `ml/src/config.py` supports seamlessly switching between synthetic test data and official/public data without changing ML logic.
-- **Future Integration**: The models produced in `ml/models/` will later be served via an API layer to the Next.js frontend.
+---
+
+## 5. Backend API Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/projects` | List projects with filtering (`sector`, `ministry`, `state`, `status`, `risk`) |
+| `GET` | `/api/projects/:projectId` | Single project metadata, latest update, and active warnings |
+| `GET` | `/api/projects/:projectId/updates` | Chronological historical monitoring snapshots |
+| `GET` | `/api/projects/:projectId/predictions` | Stored prediction history and linked warning alerts |
+| `POST` | `/api/projects/:projectId/predict` | Server-side prediction orchestration via ML service + warning generation |
+
+---
+
+## 6. Running Tests
+
+### Backend Unit & Integration Tests (TypeScript)
+```bash
+npm run test:backend
+```
+*Runs 19 tests across database constraints, ML client boundary validation, risk engine rules, and integration flows.*
+
+### Machine Learning Unit Tests (Python)
+```powershell
+.\ml\.venv\Scripts\python.exe -m unittest discover -s ml/tests -v
+```
+*Runs 26 tests across feature engineering, split disjointness, model pipelines, and FastAPI endpoints.*
+
+### Production Build Verification
+```bash
+npm run build
+```
+
+---
+
+*For detailed commands and operational guides, refer to [`COMMANDS.md`](COMMANDS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).*
