@@ -42,14 +42,14 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <span className="text-slate-400 cursor-not-allowed">
-                  Macro Analytics (Coming Soon)
-                </span>
+                <Link href="/dashboard/analytics" className="hover:text-blue-700 transition-colors">
+                  Portfolio Analytics
+                </Link>
               </li>
               <li>
-                <span className="text-slate-400 cursor-not-allowed">
-                  Alerts &amp; Dispatch (Coming Soon)
-                </span>
+                <Link href="/dashboard/alerts" className="hover:text-blue-700 transition-colors">
+                  Early Warning Alerts
+                </Link>
               </li>
             </ul>
           </div>

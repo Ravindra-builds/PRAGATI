@@ -19,8 +19,8 @@ interface RiskDriversPanelProps {
 
 export function RiskDriversPanel({
   drivers,
-  title = 'WHY THIS PROJECT IS HIGH RISK?',
-  subtitle = 'Top model-supported feature contributions based on SHAP attribution from the dual-target ML pipelines.',
+  title = 'Why this project is considered high risk',
+  subtitle = 'Model-supported signals from the predictive model.',
 }: RiskDriversPanelProps) {
   const items = drivers && drivers.length > 0 ? drivers.slice(0, 5) : []
 

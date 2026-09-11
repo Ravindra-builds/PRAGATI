@@ -15,11 +15,20 @@ import {
   Compass,
 } from 'lucide-react'
 
+interface NavLinkItem {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+  active: boolean
+  disabled?: boolean
+  badge?: string
+}
+
 export function Navbar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const navLinks = [
+  const navLinks: NavLinkItem[] = [
     { href: '/', label: 'Home', icon: Compass, active: pathname === '/' },
     {
       href: '/dashboard',
@@ -34,11 +43,10 @@ export function Navbar() {
       active: pathname.startsWith('/dashboard/projects'),
     },
     {
-      href: '#',
+      href: '/dashboard/analytics',
       label: 'Analytics',
       icon: BarChart3,
-      badge: 'Coming Soon',
-      disabled: true,
+      active: pathname.startsWith('/dashboard/analytics'),
     },
     {
       href: '/dashboard/alerts',

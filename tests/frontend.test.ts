@@ -186,3 +186,95 @@ describe('4. Early Warning Center & Alerts Service', () => {
     }
   })
 })
+
+describe('5. Portfolio Analytics & Aggregations', () => {
+  test('computes complete portfolio analytics payload with 850 projects', async () => {
+    const data = await projectService.getAnalyticsData({})
+    assert.strictEqual(data.summary.totalProjects, 850)
+    assert.ok(data.summary.totalSanctionedCostCr > 0)
+    assert.ok(data.summary.totalExpenditureCr > 0)
+    assert.ok(data.summary.costRiskExposureCr > 0)
+    assert.ok(data.summary.scheduleDelayExposureCount > 0)
+
+    const dist = data.riskDistribution
+    const totalRiskCount = dist.LOW.count + dist.MEDIUM.count + dist.HIGH.count + dist.CRITICAL.count
+    assert.strictEqual(totalRiskCount, 850)
+
+    const totalRiskPct = Math.round(dist.LOW.percentage + dist.MEDIUM.percentage + dist.HIGH.percentage + dist.CRITICAL.percentage)
+    assert.ok(totalRiskPct >= 99 && totalRiskPct <= 101)
+
+    // Verify probability buckets
+    assert.strictEqual(data.costProbabilityBuckets.length, 5)
+    assert.strictEqual(data.timeProbabilityBuckets.length, 5)
+    const costBucketTotal = data.costProbabilityBuckets.reduce((acc, b) => acc + b.count, 0)
+    assert.strictEqual(costBucketTotal, 850)
+  })
+
+  test('sector aggregations sum to total projects', async () => {
+    const data = await projectService.getAnalyticsData({})
+    assert.ok(data.bySector.length >= 6)
+    const sectorProjectsSum = data.bySector.reduce((acc, s) => acc + s.totalProjects, 0)
+    assert.strictEqual(sectorProjectsSum, 850)
+
+    for (const sec of data.bySector) {
+      assert.strictEqual(
+        sec.totalProjects,
+        sec.critical + sec.high + sec.medium + sec.low,
+        `Sector ${sec.sector} tier breakdown must sum to total projects`
+      )
+      assert.ok(sec.avgCostRisk >= 0 && sec.avgCostRisk <= 1)
+      assert.ok(sec.avgTimeRisk >= 0 && sec.avgTimeRisk <= 1)
+    }
+  })
+
+  test('filters analytics accurately by sector', async () => {
+    const filtered = await projectService.getAnalyticsData({ sector: 'Roads and Highways' })
+    assert.ok(filtered.summary.totalProjects > 0)
+    assert.ok(filtered.summary.totalProjects < 850)
+
+    for (const p of filtered.scatterPoints) {
+      assert.strictEqual(p.sector, 'Roads and Highways')
+    }
+  })
+
+  test('scatter points preserve target outcome quarantine', async () => {
+    const data = await projectService.getAnalyticsData({})
+    assert.strictEqual(data.scatterPoints.length, 850)
+
+    for (const p of data.scatterPoints) {
+      const rec = p as unknown as Record<string, unknown>
+      assert.strictEqual(rec.cost_overrun, undefined)
+      assert.strictEqual(rec.time_overrun, undefined)
+      assert.strictEqual(rec.final_cost_cr, undefined)
+      assert.strictEqual(rec.actual_duration_months, undefined)
+
+      assert.ok(p.physicalProgressPct >= 0 && p.physicalProgressPct <= 100)
+      assert.ok(p.financialProgressPct >= 0 && p.financialProgressPct <= 100)
+      assert.ok(p.costOverrunProbability >= 0 && p.costOverrunProbability <= 1)
+      assert.ok(p.timeOverrunProbability >= 0 && p.timeOverrunProbability <= 1)
+    }
+  })
+
+  test('compares two projects accurately side-by-side', async () => {
+    const comp = await projectService.compareProjects('PRJ-0001', 'PRJ-0002')
+    assert.ok(comp.projectA)
+    assert.ok(comp.projectB)
+
+    assert.strictEqual(comp.projectA?.projectId, 'PRJ-0001')
+    assert.strictEqual(comp.projectB?.projectId, 'PRJ-0002')
+
+    assert.ok(comp.projectA!.originalCostCr > 0)
+    assert.ok(comp.projectB!.originalCostCr > 0)
+
+    // Verify burn gap formula: financial - physical
+    assert.strictEqual(
+      comp.projectA!.burnGap,
+      Math.round((comp.projectA!.financialProgressPct - comp.projectA!.physicalProgressPct) * 10) / 10
+    )
+
+    // Verify outcome quarantine on comparison response
+    const recA = comp.projectA as unknown as Record<string, unknown>
+    assert.strictEqual(recA.cost_overrun, undefined)
+    assert.strictEqual(recA.time_overrun, undefined)
+  })
+})

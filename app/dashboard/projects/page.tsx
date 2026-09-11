@@ -104,7 +104,9 @@ export default function ProjectsDirectoryPage() {
   }, [page, debouncedQuery, selectedSector, selectedStatus, selectedRisk])
 
   useEffect(() => {
-    fetchProjects()
+    queueMicrotask(() => {
+      fetchProjects()
+    })
   }, [fetchProjects])
 
   const totalPages = Math.ceil(total / pageSize) || 1
@@ -140,7 +142,7 @@ export default function ProjectsDirectoryPage() {
             </span>
           </div>
           <p className="mt-1 text-xs sm:text-sm text-slate-500">
-            Catalog of national infrastructure projects with live ML risk indicators and progress metrics.
+            Browse monitored projects and view their latest risk predictions.
           </p>
         </div>
 

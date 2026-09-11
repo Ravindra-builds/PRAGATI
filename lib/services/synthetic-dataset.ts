@@ -49,6 +49,122 @@ export interface SyntheticPrediction {
   createdAt: Date
 }
 
+export interface AnalyticsFilters {
+  ministry?: string
+  sector?: string
+  state?: string
+  risk?: string
+}
+
+export interface SectorAnalyticsItem {
+  sector: string
+  totalProjects: number
+  critical: number
+  high: number
+  medium: number
+  low: number
+  avgCostRisk: number
+  avgTimeRisk: number
+  totalSanctionedCostCr: number
+  totalExpenditureCr: number
+}
+
+export interface MinistryAnalyticsItem {
+  ministry: string
+  totalProjects: number
+  critical: number
+  high: number
+  medium: number
+  low: number
+  avgCostRisk: number
+  avgTimeRisk: number
+  totalSanctionedCostCr: number
+}
+
+export interface StateAnalyticsItem {
+  state: string
+  totalProjects: number
+  critical: number
+  high: number
+  medium: number
+  low: number
+  avgCostRisk: number
+  avgTimeRisk: number
+  totalSanctionedCostCr: number
+}
+
+export interface ProgressScatterPoint {
+  projectId: string
+  name: string
+  sector: string
+  ministry: string
+  state: string
+  physicalProgressPct: number
+  financialProgressPct: number
+  scheduleCompletionPct: number
+  budgetUtilizationPct: number
+  costOverrunProbability: number
+  timeOverrunProbability: number
+  overallRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  burnGap: number
+  scheduleProgressGap: number
+}
+
+export interface ProbabilityBucket {
+  range: string
+  count: number
+  percentage: number
+}
+
+export interface TemporalTrendPoint {
+  snapshotMonth: string
+  avgPhysicalProgressPct: number
+  avgFinancialProgressPct: number
+  totalSnapshots: number
+  highOrCriticalCount: number
+}
+
+export interface ProjectLookupItem {
+  projectId: string
+  name: string
+  sector: string
+}
+
+export interface AnalyticsPayload {
+  summary: {
+    totalProjects: number
+    criticalProjects: number
+    highRiskProjects: number
+    mediumRiskProjects: number
+    lowRiskProjects: number
+    highOrCriticalPct: number
+    totalSanctionedCostCr: number
+    totalExpenditureCr: number
+    costRiskExposureCr: number
+    scheduleDelayExposureCount: number
+    scheduleDelayExposurePct: number
+  }
+  riskDistribution: {
+    LOW: { count: number; percentage: number }
+    MEDIUM: { count: number; percentage: number }
+    HIGH: { count: number; percentage: number }
+    CRITICAL: { count: number; percentage: number }
+  }
+  bySector: SectorAnalyticsItem[]
+  byMinistry: MinistryAnalyticsItem[]
+  byState: StateAnalyticsItem[]
+  scatterPoints: ProgressScatterPoint[]
+  costProbabilityBuckets: ProbabilityBucket[]
+  timeProbabilityBuckets: ProbabilityBucket[]
+  temporalTrend: TemporalTrendPoint[]
+  filterOptions: {
+    ministries: string[]
+    sectors: string[]
+    states: string[]
+  }
+  projectList: ProjectLookupItem[]
+}
+
 export interface AlertFilters {
   severity?: string
   warningType?: string
@@ -617,6 +733,463 @@ class SyntheticDatasetService {
       offset,
       alerts: paginated,
       summary,
+    }
+  }
+
+  getAnalyticsData(filters: AnalyticsFilters = {}): AnalyticsPayload {
+    this.loadData()
+    const all = Array.from(this.projectsMap!.values())
+
+    // Distinct filter options before filtering
+    const distinctMinistries = new Set<string>()
+    const distinctSectors = new Set<string>()
+    const distinctStates = new Set<string>()
+
+    for (const p of all) {
+      if (p.ministry) distinctMinistries.add(p.ministry)
+      if (p.sector) distinctSectors.add(p.sector)
+      if (p.state) distinctStates.add(p.state)
+    }
+
+    let filtered = all
+
+    if (filters.ministry && filters.ministry !== 'ALL') {
+      const m = filters.ministry.toLowerCase()
+      filtered = filtered.filter((p) => p.ministry.toLowerCase() === m)
+    }
+    if (filters.sector && filters.sector !== 'ALL') {
+      const s = filters.sector.toLowerCase()
+      filtered = filtered.filter((p) => p.sector.toLowerCase() === s)
+    }
+    if (filters.state && filters.state !== 'ALL') {
+      const st = filters.state.toLowerCase()
+      filtered = filtered.filter((p) => p.state.toLowerCase() === st)
+    }
+    if (filters.risk && filters.risk !== 'ALL') {
+      const r = filters.risk.toUpperCase()
+      filtered = filtered.filter(
+        (p) => p.latestPrediction?.overallRiskLevel === r
+      )
+    }
+
+    const totalProjects = filtered.length
+
+    let criticalProjects = 0
+    let highRiskProjects = 0
+    let mediumRiskProjects = 0
+    let lowRiskProjects = 0
+
+    let totalSanctionedCostCr = 0
+    let totalExpenditureCr = 0
+    let costRiskExposureCr = 0
+    let scheduleDelayExposureCount = 0
+
+    const sectorMap = new Map<
+      string,
+      {
+        total: number
+        critical: number
+        high: number
+        medium: number
+        low: number
+        costProbSum: number
+        timeProbSum: number
+        costCr: number
+        expCr: number
+      }
+    >()
+
+    const ministryMap = new Map<
+      string,
+      {
+        total: number
+        critical: number
+        high: number
+        medium: number
+        low: number
+        costProbSum: number
+        timeProbSum: number
+        costCr: number
+      }
+    >()
+
+    const stateMap = new Map<
+      string,
+      {
+        total: number
+        critical: number
+        high: number
+        medium: number
+        low: number
+        costProbSum: number
+        timeProbSum: number
+        costCr: number
+      }
+    >()
+
+    const costBuckets = [0, 0, 0, 0, 0]
+    const timeBuckets = [0, 0, 0, 0, 0]
+
+    const scatterPoints: ProgressScatterPoint[] = []
+
+    for (const p of filtered) {
+      const risk = p.latestPrediction?.overallRiskLevel || 'LOW'
+      if (risk === 'CRITICAL') criticalProjects++
+      else if (risk === 'HIGH') highRiskProjects++
+      else if (risk === 'MEDIUM') mediumRiskProjects++
+      else lowRiskProjects++
+
+      totalSanctionedCostCr += p.originalCostCr
+      if (p.latestUpdate) {
+        totalExpenditureCr += p.latestUpdate.expenditureCr
+      }
+
+      const costProb = p.latestPrediction?.costOverrunProbability || 0
+      const timeProb = p.latestPrediction?.timeOverrunProbability || 0
+
+      if (costProb >= 0.5 || risk === 'HIGH' || risk === 'CRITICAL') {
+        costRiskExposureCr += p.originalCostCr
+      }
+
+      if (timeProb >= 0.5) {
+        scheduleDelayExposureCount++
+      }
+
+      const costBucketIdx = Math.min(Math.floor(costProb * 5), 4)
+      costBuckets[costBucketIdx]++
+      const timeBucketIdx = Math.min(Math.floor(timeProb * 5), 4)
+      timeBuckets[timeBucketIdx]++
+
+      // Sector Aggregation
+      const sec = p.sector || 'Other'
+      if (!sectorMap.has(sec)) {
+        sectorMap.set(sec, {
+          total: 0,
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          costProbSum: 0,
+          timeProbSum: 0,
+          costCr: 0,
+          expCr: 0,
+        })
+      }
+      const sItem = sectorMap.get(sec)!
+      sItem.total++
+      if (risk === 'CRITICAL') sItem.critical++
+      else if (risk === 'HIGH') sItem.high++
+      else if (risk === 'MEDIUM') sItem.medium++
+      else sItem.low++
+      sItem.costProbSum += costProb
+      sItem.timeProbSum += timeProb
+      sItem.costCr += p.originalCostCr
+      if (p.latestUpdate) sItem.expCr += p.latestUpdate.expenditureCr
+
+      // Ministry Aggregation
+      const min = p.ministry || 'Other'
+      if (!ministryMap.has(min)) {
+        ministryMap.set(min, {
+          total: 0,
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          costProbSum: 0,
+          timeProbSum: 0,
+          costCr: 0,
+        })
+      }
+      const mItem = ministryMap.get(min)!
+      mItem.total++
+      if (risk === 'CRITICAL') mItem.critical++
+      else if (risk === 'HIGH') mItem.high++
+      else if (risk === 'MEDIUM') mItem.medium++
+      else mItem.low++
+      mItem.costProbSum += costProb
+      mItem.timeProbSum += timeProb
+      mItem.costCr += p.originalCostCr
+
+      // State Aggregation
+      const st = p.state || 'Other'
+      if (!stateMap.has(st)) {
+        stateMap.set(st, {
+          total: 0,
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          costProbSum: 0,
+          timeProbSum: 0,
+          costCr: 0,
+        })
+      }
+      const stItem = stateMap.get(st)!
+      stItem.total++
+      if (risk === 'CRITICAL') stItem.critical++
+      else if (risk === 'HIGH') stItem.high++
+      else if (risk === 'MEDIUM') stItem.medium++
+      else stItem.low++
+      stItem.costProbSum += costProb
+      stItem.timeProbSum += timeProb
+      stItem.costCr += p.originalCostCr
+
+      // Scatter Points
+      if (p.latestUpdate) {
+        const schedComp =
+          p.plannedDurationMonths > 0
+            ? (p.latestUpdate.elapsedMonths / p.plannedDurationMonths) * 100
+            : 0
+        const budgetUtil =
+          p.originalCostCr > 0
+            ? (p.latestUpdate.expenditureCr / p.originalCostCr) * 100
+            : 0
+        const burnGap =
+          p.latestUpdate.financialProgressPct - p.latestUpdate.physicalProgressPct
+        const scheduleGap = schedComp - p.latestUpdate.physicalProgressPct
+
+        scatterPoints.push({
+          projectId: p.projectId,
+          name: p.name,
+          sector: p.sector,
+          ministry: p.ministry,
+          state: p.state,
+          physicalProgressPct: Math.round(p.latestUpdate.physicalProgressPct * 10) / 10,
+          financialProgressPct: Math.round(p.latestUpdate.financialProgressPct * 10) / 10,
+          scheduleCompletionPct: Math.round(schedComp * 10) / 10,
+          budgetUtilizationPct: Math.round(budgetUtil * 10) / 10,
+          costOverrunProbability: costProb,
+          timeOverrunProbability: timeProb,
+          overallRiskLevel: risk,
+          burnGap: Math.round(burnGap * 10) / 10,
+          scheduleProgressGap: Math.round(scheduleGap * 10) / 10,
+        })
+      }
+    }
+
+    const bySector: SectorAnalyticsItem[] = Array.from(sectorMap.entries())
+      .map(([sector, d]) => ({
+        sector,
+        totalProjects: d.total,
+        critical: d.critical,
+        high: d.high,
+        medium: d.medium,
+        low: d.low,
+        avgCostRisk: d.total > 0 ? Math.round((d.costProbSum / d.total) * 1000) / 1000 : 0,
+        avgTimeRisk: d.total > 0 ? Math.round((d.timeProbSum / d.total) * 1000) / 1000 : 0,
+        totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
+        totalExpenditureCr: Math.round(d.expCr * 10) / 10,
+      }))
+      .sort(
+        (a, b) =>
+          b.critical + b.high - (a.critical + a.high) || b.totalProjects - a.totalProjects
+      )
+
+    const byMinistry: MinistryAnalyticsItem[] = Array.from(ministryMap.entries())
+      .map(([ministry, d]) => ({
+        ministry,
+        totalProjects: d.total,
+        critical: d.critical,
+        high: d.high,
+        medium: d.medium,
+        low: d.low,
+        avgCostRisk: d.total > 0 ? Math.round((d.costProbSum / d.total) * 1000) / 1000 : 0,
+        avgTimeRisk: d.total > 0 ? Math.round((d.timeProbSum / d.total) * 1000) / 1000 : 0,
+        totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
+      }))
+      .sort((a, b) => b.totalProjects - a.totalProjects)
+
+    const byState: StateAnalyticsItem[] = Array.from(stateMap.entries())
+      .map(([state, d]) => ({
+        state,
+        totalProjects: d.total,
+        critical: d.critical,
+        high: d.high,
+        medium: d.medium,
+        low: d.low,
+        avgCostRisk: d.total > 0 ? Math.round((d.costProbSum / d.total) * 1000) / 1000 : 0,
+        avgTimeRisk: d.total > 0 ? Math.round((d.timeProbSum / d.total) * 1000) / 1000 : 0,
+        totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
+      }))
+      .sort(
+        (a, b) =>
+          b.critical + b.high - (a.critical + a.high) || b.totalProjects - a.totalProjects
+      )
+
+    const bucketRanges = ['0 - 20%', '20 - 40%', '40 - 60%', '60 - 80%', '80 - 100%']
+    const costProbabilityBuckets: ProbabilityBucket[] = bucketRanges.map((range, idx) => ({
+      range,
+      count: costBuckets[idx],
+      percentage:
+        totalProjects > 0 ? Math.round((costBuckets[idx] / totalProjects) * 1000) / 10 : 0,
+    }))
+
+    const timeProbabilityBuckets: ProbabilityBucket[] = bucketRanges.map((range, idx) => ({
+      range,
+      count: timeBuckets[idx],
+      percentage:
+        totalProjects > 0 ? Math.round((timeBuckets[idx] / totalProjects) * 1000) / 10 : 0,
+    }))
+
+    // Temporal trend across snapshots
+    const monthMap = new Map<
+      string,
+      { total: number; physSum: number; finSum: number; highRiskCount: number }
+    >()
+    for (const p of filtered) {
+      const isHighOrCritical =
+        p.latestPrediction?.overallRiskLevel === 'HIGH' ||
+        p.latestPrediction?.overallRiskLevel === 'CRITICAL'
+      for (const u of p.updates) {
+        if (!monthMap.has(u.snapshotMonth)) {
+          monthMap.set(u.snapshotMonth, {
+            total: 0,
+            physSum: 0,
+            finSum: 0,
+            highRiskCount: 0,
+          })
+        }
+        const mObj = monthMap.get(u.snapshotMonth)!
+        mObj.total++
+        mObj.physSum += u.physicalProgressPct
+        mObj.finSum += u.financialProgressPct
+        if (isHighOrCritical) mObj.highRiskCount++
+      }
+    }
+
+    const allMonths = Array.from(monthMap.keys()).sort()
+    const selectedMonths = allMonths.slice(-16)
+
+    const temporalTrend: TemporalTrendPoint[] = selectedMonths.map((m) => {
+      const obj = monthMap.get(m)!
+      return {
+        snapshotMonth: m,
+        avgPhysicalProgressPct:
+          obj.total > 0 ? Math.round((obj.physSum / obj.total) * 10) / 10 : 0,
+        avgFinancialProgressPct:
+          obj.total > 0 ? Math.round((obj.finSum / obj.total) * 10) / 10 : 0,
+        totalSnapshots: obj.total,
+        highOrCriticalCount: obj.highRiskCount,
+      }
+    })
+
+    const highOrCriticalCount = criticalProjects + highRiskProjects
+    const highOrCriticalPct =
+      totalProjects > 0 ? Math.round((highOrCriticalCount / totalProjects) * 1000) / 10 : 0
+
+    return {
+      summary: {
+        totalProjects,
+        criticalProjects,
+        highRiskProjects,
+        mediumRiskProjects,
+        lowRiskProjects,
+        highOrCriticalPct,
+        totalSanctionedCostCr: Math.round(totalSanctionedCostCr * 10) / 10,
+        totalExpenditureCr: Math.round(totalExpenditureCr * 10) / 10,
+        costRiskExposureCr: Math.round(costRiskExposureCr * 10) / 10,
+        scheduleDelayExposureCount,
+        scheduleDelayExposurePct:
+          totalProjects > 0
+            ? Math.round((scheduleDelayExposureCount / totalProjects) * 1000) / 10
+            : 0,
+      },
+      riskDistribution: {
+        LOW: {
+          count: lowRiskProjects,
+          percentage:
+            totalProjects > 0 ? Math.round((lowRiskProjects / totalProjects) * 1000) / 10 : 0,
+        },
+        MEDIUM: {
+          count: mediumRiskProjects,
+          percentage:
+            totalProjects > 0 ? Math.round((mediumRiskProjects / totalProjects) * 1000) / 10 : 0,
+        },
+        HIGH: {
+          count: highRiskProjects,
+          percentage:
+            totalProjects > 0 ? Math.round((highRiskProjects / totalProjects) * 1000) / 10 : 0,
+        },
+        CRITICAL: {
+          count: criticalProjects,
+          percentage:
+            totalProjects > 0 ? Math.round((criticalProjects / totalProjects) * 1000) / 10 : 0,
+        },
+      },
+      bySector,
+      byMinistry,
+      byState,
+      scatterPoints,
+      costProbabilityBuckets,
+      timeProbabilityBuckets,
+      temporalTrend,
+      filterOptions: {
+        ministries: Array.from(distinctMinistries).sort(),
+        sectors: Array.from(distinctSectors).sort(),
+        states: Array.from(distinctStates).sort(),
+      },
+      projectList: all.slice(0, 80).map((p) => ({
+        projectId: p.projectId,
+        name: p.name,
+        sector: p.sector,
+      })),
+    }
+  }
+
+  compareProjects(projectIdA: string, projectIdB: string) {
+    this.loadData()
+    const pA = this.projectsMap!.get(projectIdA) || null
+    const pB = this.projectsMap!.get(projectIdB) || null
+
+    const formatProject = (p: SyntheticProject | null) => {
+      if (!p) return null
+      const schedComp =
+        p.plannedDurationMonths > 0 && p.latestUpdate
+          ? (p.latestUpdate.elapsedMonths / p.plannedDurationMonths) * 100
+          : 0
+      const burnGap = p.latestUpdate
+        ? p.latestUpdate.financialProgressPct - p.latestUpdate.physicalProgressPct
+        : 0
+      const milestoneRatio =
+        p.latestUpdate && p.latestUpdate.milestonesTotal > 0
+          ? (p.latestUpdate.milestonesDelayed / p.latestUpdate.milestonesTotal) * 100
+          : 0
+
+      return {
+        projectId: p.projectId,
+        name: p.name,
+        sector: p.sector,
+        ministry: p.ministry,
+        state: p.state,
+        implementingAgency: p.implementingAgency,
+        originalCostCr: p.originalCostCr,
+        plannedDurationMonths: p.plannedDurationMonths,
+        status: p.status,
+        physicalProgressPct: p.latestUpdate ? p.latestUpdate.physicalProgressPct : 0,
+        financialProgressPct: p.latestUpdate ? p.latestUpdate.financialProgressPct : 0,
+        expenditureCr: p.latestUpdate ? p.latestUpdate.expenditureCr : 0,
+        elapsedMonths: p.latestUpdate ? p.latestUpdate.elapsedMonths : 0,
+        scheduleCompletionPct: Math.round(schedComp * 10) / 10,
+        burnGap: Math.round(burnGap * 10) / 10,
+        milestonesTotal: p.latestUpdate ? p.latestUpdate.milestonesTotal : 0,
+        milestonesDelayed: p.latestUpdate ? p.latestUpdate.milestonesDelayed : 0,
+        milestoneSlippageRatio: Math.round(milestoneRatio * 10) / 10,
+        costOverrunProbability: p.latestPrediction
+          ? p.latestPrediction.costOverrunProbability
+          : 0,
+        timeOverrunProbability: p.latestPrediction
+          ? p.latestPrediction.timeOverrunProbability
+          : 0,
+        overallRiskLevel: p.latestPrediction
+          ? p.latestPrediction.overallRiskLevel
+          : 'LOW',
+        activeWarningsCount: p.warnings.length,
+      }
+    }
+
+    return {
+      projectA: formatProject(pA),
+      projectB: formatProject(pB),
     }
   }
 }

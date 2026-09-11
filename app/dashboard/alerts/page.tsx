@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation'
 import {
   AlertTriangle,
   Search,
-  Filter,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -15,11 +14,8 @@ import {
   AlertCircle,
   ShieldAlert,
   ArrowRight,
-  ExternalLink,
-  Building2,
   X,
   Info,
-  SlidersHorizontal,
   LayoutDashboard,
   Layers,
 } from 'lucide-react'
@@ -98,11 +94,11 @@ function AlertsContent() {
   }, [searchQuery])
 
   // Sync initial search param if URL updates
-  useEffect(() => {
-    if (initialProjectId) {
-      setProjectIdFilter(initialProjectId)
-    }
-  }, [initialProjectId])
+  const [prevInitialProjectId, setPrevInitialProjectId] = useState(initialProjectId)
+  if (initialProjectId !== prevInitialProjectId) {
+    setPrevInitialProjectId(initialProjectId)
+    setProjectIdFilter(initialProjectId)
+  }
 
   const fetchAlerts = useCallback(async () => {
     setLoading(true)
@@ -143,7 +139,9 @@ function AlertsContent() {
   }, [selectedSeverity, selectedWarningType, selectedSector, projectIdFilter, debouncedSearch, page])
 
   useEffect(() => {
-    fetchAlerts()
+    queueMicrotask(() => {
+      fetchAlerts()
+    })
   }, [fetchAlerts])
 
   const totalPages = Math.ceil(total / limit) || 1

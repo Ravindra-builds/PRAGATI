@@ -73,8 +73,6 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [latestDrivers, setLatestDrivers] = useState<DriverItem[] | null>(null)
 
   const fetchProject = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch(`/api/projects/${projectId}`)
       if (!res.ok) {
@@ -82,6 +80,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       }
       const data = await res.json()
       setProject(data)
+      setError(null)
 
       // If project has updates, compute initial heuristic drivers if not predicted yet
       if (data.updates && data.updates.length > 0) {
@@ -139,7 +138,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   }, [projectId])
 
   useEffect(() => {
-    fetchProject()
+    queueMicrotask(() => {
+      fetchProject()
+    })
   }, [fetchProject])
 
   const handleRunPrediction = async () => {
@@ -375,7 +376,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
               {(costProb * 100).toFixed(1)}%
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              Probability of exceeding approved budget sanction
+              Chance of budget overrun
             </p>
           </div>
 
@@ -440,7 +441,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
               {(timeProb * 100).toFixed(1)}%
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              Probability of project completion deadline breach
+              Chance of schedule delay
             </p>
           </div>
 

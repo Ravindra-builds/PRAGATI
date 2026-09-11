@@ -111,7 +111,9 @@ export default function DashboardPage() {
   }, [selectedSector, selectedMinistry, selectedState])
 
   useEffect(() => {
-    fetchSummary()
+    queueMicrotask(() => {
+      fetchSummary()
+    })
   }, [fetchSummary])
 
   const resetFilters = () => {
@@ -306,7 +308,7 @@ export default function DashboardPage() {
                 Portfolio Risk Tier Breakdown
               </h2>
               <p className="text-xs text-slate-500">
-                Categorized by dual-target ML probability thresholds (0.50 cutoff).
+                Projects grouped by current predicted risk.
               </p>
             </div>
             <span className="text-xs text-slate-400 font-mono">

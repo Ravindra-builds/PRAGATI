@@ -8,9 +8,14 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
-import { syntheticDatasetService, AlertFilters } from './synthetic-dataset'
+import {
+  syntheticDatasetService,
+  AlertFilters,
+  AnalyticsFilters,
+  AnalyticsPayload,
+} from './synthetic-dataset'
 
-export type { AlertFilters }
+export type { AlertFilters, AnalyticsFilters, AnalyticsPayload }
 
 export interface ProjectFilters {
   sector?: string
@@ -526,6 +531,23 @@ export class ProjectService {
     } catch {
       return syntheticDatasetService.getAlerts(filters)
     }
+  }
+
+  /**
+   * Portfolio analytics aggregates covering risk distribution, sector/ministry breakdowns,
+   * progress scatter points, and temporal risk trajectory.
+   */
+  async getAnalyticsData(filters: AnalyticsFilters = {}): Promise<AnalyticsPayload> {
+    // Leverage the fully loaded and verified dataset service for portfolio-scale analytics
+    return syntheticDatasetService.getAnalyticsData(filters)
+  }
+
+  /**
+   * Compare two selected projects side-by-side across key physical, financial, schedule,
+   * and ML risk metrics.
+   */
+  async compareProjects(projectIdA: string, projectIdB: string) {
+    return syntheticDatasetService.compareProjects(projectIdA, projectIdB)
   }
 }
 

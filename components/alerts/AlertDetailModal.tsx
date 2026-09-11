@@ -11,11 +11,6 @@ import {
   ExternalLink,
   ShieldAlert,
   Building2,
-  Calendar,
-  Layers,
-  MapPin,
-  IndianRupee,
-  CheckCircle2,
 } from 'lucide-react'
 import { RiskBadge, RiskTier } from '@/components/ui/RiskBadge'
 
@@ -200,7 +195,7 @@ export function AlertDetailModal({ alert, isOpen, onClose }: AlertDetailModalPro
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
           {/* Summary Alert Message */}
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm leading-relaxed">
-            <p className="font-medium text-slate-900 mb-1">Official Warning Synopsis</p>
+            <p className="font-medium text-slate-900 mb-1">Warning Synopsis</p>
             <p>{alert.message}</p>
           </div>
 
