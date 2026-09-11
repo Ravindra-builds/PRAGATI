@@ -13,6 +13,7 @@ Large-scale infrastructure projects (such as highways, railways, bridges, and po
 This workspace provides an isolated, reproducible environment to:
 - Ingest and validate project monitoring records (both synthetic prototypes and public/official records).
 - Conduct Exploratory Data Analysis (EDA) on key project bottlenecks.
+- Engineer leakage-safe predictive indicators and build preprocessing pipelines.
 - Train predictive machine learning models that assess the probability and scale of project delays and budget overruns.
 - Package lightweight, validated model artifacts that can later be served via backend APIs to dashboard users.
 
@@ -30,71 +31,94 @@ Traditional monitoring identifies delays **after** they have already occurred. T
 
 ## 3. Core Machine Learning Concepts Explained
 
-To keep collaboration clear across engineering disciplines, here are the core concepts used throughout this workspace:
-
-- **Input Features ($X$)**: The known snapshot indicators observable at prediction time. For example: `physical_progress_pct`, `financial_progress_pct`, `original_cost_cr`, `elapsed_months`, and `milestones_delayed`.
-- **Target / Label ($y$)**: The future outcome we want the model to predict, such as `time_overrun` (will the project finish late?) or `cost_overrun` (will it exceed budget?). Crucially, targets are unknown during ongoing project execution.
-- **Training**: The phase where algorithms analyze historical completed projects, learning patterns between input features and known outcomes to tune internal mathematical parameters.
-- **Testing**: Evaluating the trained model on unseen historical projects to objectively measure how accurately it generalizes to new, real-world data.
-- **Prediction**: Running new, active project data through the trained model during ongoing monitoring to generate risk scores, predicted delays, and warning flags.
+- **Input Features ($X$)**: The known snapshot indicators observable at prediction time (e.g. `physical_progress_pct`, `financial_progress_pct`, `original_cost_cr`, `elapsed_months`, `schedule_progress_gap`, `cost_velocity`).
+- **Target / Label ($y$)**: The future outcome we want the model to predict (`time_overrun` and `cost_overrun`). Crucially, targets are unknown during ongoing project execution and quarantined from $X$.
+- **Training**: The phase where algorithms analyze historical projects, learning patterns between input features and known outcomes to tune internal mathematical parameters.
+- **Testing**: Evaluating the trained model on unseen future/separate projects to objectively measure how accurately it generalizes.
+- **Prediction**: Running new, active project data through the trained model during ongoing monitoring to generate risk scores and early warning flags.
 
 ---
 
-## 4. Planned End-to-End Pipeline
-
-The ML lifecycle is planned as a disciplined, staged progression:
+## 4. End-to-End Pipeline & Current Progress
 
 ```text
-Dataset (Synthetic / Public)
+[x] Dataset (Synthetic Multi-Snapshot PAIMANA Generation)
        │
        ▼
-Exploratory Data Analysis (EDA)
+[x] Exploratory Data Analysis (EDA & Visualizations)
        │
        ▼
-Data Validation (Schema & Bounds)
+[x] Data Validation (Automated 10-point Suite)
        │
        ▼
-Data Cleaning (Missing Values & Outliers)
+[x] Target Quarantine (Strict Post-Completion Isolation)
        │
        ▼
-Preprocessing (Scaling & Encoding)
+[x] Feature Engineering (Burn Rates, Gaps, Velocities)
        │
        ▼
-Feature Engineering (Burn Rates, Cost Velocity, Lag Metrics)
+[x] Preprocessing Pipeline (Imputation, RobustScaler, OneHotEncoder)
        │
        ▼
-Train / Test Strategy (Temporal / Group Splits)
+[x] Validation Strategy (Project-Grouped Temporal Holdout)
        │
        ▼
-Baseline Model (Heuristics & Simple Regressors/Classifiers)
+[x] Baseline Models (Logistic Regression)
        │
        ▼
-ML Models (Gradient Boosted Trees, Random Forests, etc.)
+[x] Advanced ML Models (Random Forest & Gradient Boosting)
        │
        ▼
-Model Evaluation (PR-AUC, F1-Score, RMSE, Calibration)
+[x] Model Evaluation & Overfitting Diagnosis (Precision, Recall, F1, ROC-AUC, PR-AUC)
        │
        ▼
-Explainability (SHAP / Feature Importances for Auditability)
+[x] Explainability (Permutation Feature Importance)
        │
        ▼
-Saved Model Artifacts (.joblib format)
+[x] Saved Model Artifacts (model.joblib + metadata.json)
        │
        ▼
-Prediction Service (Inference API integration)
+[ ] Prediction Service (Inference API integration - Next Phase)
 ```
-
-> [!IMPORTANT]
-> **Current Status**: Only the foundation, workspace structure, environment, configuration, and data dictionary are implemented at this stage. Data generation, feature engineering, and model training will proceed systematically in subsequent tasks.
 
 ---
 
-## 5. Directory Overview
+## 5. ML Source Modules (`ml/src/`)
 
-- `data/`: Contains `raw/`, `processed/`, and `synthetic/` subdirectories. Raw data and processed artifacts are ignored by version control.
-- `notebooks/`: Jupyter notebooks for visual data exploration and prototyping.
-- `src/`: Reusable Python modules (configurations, dataset loaders, transformers).
-- `models/`: Destination for serialized model checkpoints and preprocessing pipelines.
-- `reports/eda/`: Generated figures, summary tables, and analytical reports.
-- `tests/`: Automated unit and integration tests for data loading and feature pipelines.
-- `DATA_DICTIONARY.md`: Full specification of fields, data types, and data leakage safeguards.
+- [`config.py`](src/config.py): Centralized paths, random seeds, threshold definitions, and data source abstraction.
+- [`generate_synthetic_data.py`](src/generate_synthetic_data.py): Multi-snapshot synthetic data generator with 5 risk archetypes.
+- [`validate_dataset.py`](src/validate_dataset.py): 10-point data validation suite.
+- [`targets.py`](src/targets.py): Target quarantine module enforcing zero leakage of future outcome variables into $X$.
+- [`features.py`](src/features.py): Feature engineering module computing 7 derived metrics (schedule completion, gaps, slippage ratios, velocities) with zero-division safety.
+- [`preprocessing.py`](src/preprocessing.py): Scikit-learn `ColumnTransformer` (median imputation, `RobustScaler`, `OneHotEncoder`) strictly fitted only on training data.
+- [`split.py`](src/split.py): Project-grouped temporal splitting ensuring projects never overlap across train and test partitions.
+- [`train_models.py`](src/train_models.py): Model training harness, evaluation, overfitting diagnostics, permutation importance, and artifact serialization.
+- [`predict_sample.py`](src/predict_sample.py): Inference demonstration loading saved pipelines and predicting on unseen test projects.
+- [`demo_pipeline.py`](src/demo_pipeline.py): End-to-end demonstration running `raw row -> engineered row -> X, y -> split -> preprocessed matrices`.
+
+---
+
+## 6. How to Run the Modules
+
+Activate the virtual environment first:
+```powershell
+.\ml\.venv\Scripts\Activate.ps1
+```
+
+1. **Train & Evaluate All Models**:
+   ```bash
+   python ml/src/train_models.py
+   ```
+2. **Run Sample Inference on Test Projects**:
+   ```bash
+   python ml/src/predict_sample.py
+   ```
+3. **Run Automated Unit Tests (15 Tests)**:
+   ```bash
+   python -m unittest discover -s ml/tests
+   ```
+4. **Run Dataset Validation Suite**:
+   ```bash
+   python ml/src/validate_dataset.py
+   ```
+

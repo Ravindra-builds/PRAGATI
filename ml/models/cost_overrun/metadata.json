@@ -1,0 +1,133 @@
+{
+  "model_type": "Logistic Regression",
+  "target": "cost_overrun",
+  "decision_threshold": 0.5,
+  "training_timestamp": "2026-09-11T07:28:58.295347+00:00",
+  "random_seed": 42,
+  "dataset": {
+    "source": "synthetic_projects_snapshot.csv",
+    "total_rows": 8174,
+    "total_projects": 850,
+    "train_rows": 6435,
+    "train_projects": 638,
+    "test_rows": 1739,
+    "test_projects": 212
+  },
+  "validation_strategy": "Project-Grouped Temporal Holdout (Earliest Snapshot Horizon)",
+  "test_metrics": {
+    "accuracy": 0.8332,
+    "precision": 0.7845,
+    "recall": 0.8852,
+    "f1": 0.8318,
+    "roc_auc": 0.9244,
+    "pr_auc": 0.9246,
+    "tn": 732,
+    "fp": 197,
+    "fn": 93,
+    "tp": 717,
+    "total": 1739,
+    "pos_prevalence": 46.58
+  },
+  "train_metrics": {
+    "accuracy": 0.9133,
+    "precision": 0.884,
+    "recall": 0.9229,
+    "f1": 0.903,
+    "roc_auc": 0.9754,
+    "pr_auc": 0.9718,
+    "tn": 3279,
+    "fp": 341,
+    "fn": 217,
+    "tp": 2598,
+    "total": 6435,
+    "pos_prevalence": 43.75
+  },
+  "overfitting_gap": {
+    "f1_gap": 0.0712,
+    "roc_auc_gap": 0.051
+  },
+  "top_10_features": [
+    {
+      "feature": "budget_utilization_pct",
+      "importance_mean": 0.3746,
+      "importance_std": 0.00981
+    },
+    {
+      "feature": "physical_progress_pct",
+      "importance_mean": 0.23597,
+      "importance_std": 0.00794
+    },
+    {
+      "feature": "financial_progress_pct",
+      "importance_mean": 0.18475,
+      "importance_std": 0.0069
+    },
+    {
+      "feature": "schedule_progress_gap",
+      "importance_mean": 0.17369,
+      "importance_std": 0.00705
+    },
+    {
+      "feature": "schedule_completion_pct",
+      "importance_mean": 0.17073,
+      "importance_std": 0.00695
+    },
+    {
+      "feature": "elapsed_months",
+      "importance_mean": 0.06155,
+      "importance_std": 0.0045
+    },
+    {
+      "feature": "expenditure_cr",
+      "importance_mean": 0.01995,
+      "importance_std": 0.00186
+    },
+    {
+      "feature": "project_status",
+      "importance_mean": 0.01091,
+      "importance_std": 0.00185
+    },
+    {
+      "feature": "milestones_delayed",
+      "importance_mean": 0.01047,
+      "importance_std": 0.00197
+    },
+    {
+      "feature": "expenditure_burn_gap",
+      "importance_mean": 0.00699,
+      "importance_std": 0.00185
+    }
+  ],
+  "raw_numeric_features": [
+    "original_cost_cr",
+    "planned_duration_months",
+    "elapsed_months",
+    "physical_progress_pct",
+    "financial_progress_pct",
+    "expenditure_cr",
+    "milestones_total",
+    "milestones_delayed"
+  ],
+  "raw_categorical_features": [
+    "ministry",
+    "sector",
+    "implementing_agency",
+    "state",
+    "project_status"
+  ],
+  "derived_features": [
+    "schedule_completion_pct",
+    "schedule_progress_gap",
+    "expenditure_burn_gap",
+    "milestone_slippage_ratio",
+    "budget_utilization_pct",
+    "progress_velocity",
+    "cost_velocity"
+  ],
+  "excluded_outcome_columns": [
+    "cost_overrun",
+    "time_overrun",
+    "final_cost_cr",
+    "actual_duration_months"
+  ]
+}

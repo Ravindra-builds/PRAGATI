@@ -61,10 +61,10 @@ ml/data/raw/*
 !ml/data/raw/.gitkeep
 ml/data/processed/*
 !ml/data/processed/.gitkeep
-ml/models/*
-!ml/models/.gitkeep
-ml/reports/eda/*
-!ml/reports/eda/.gitkeep
+ml/models/**/*.joblib
+ml/models/*.joblib
+!ml/models/**/metadata.json
+!ml/models/**/.gitkeep
 
 # IDEs
 .idea/

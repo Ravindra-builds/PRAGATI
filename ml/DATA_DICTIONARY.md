@@ -1,57 +1,72 @@
 # Data Dictionary: Infrastructure Project Monitoring
 
-This data dictionary documents the candidate schema for the PAIMANA/OCMS-style infrastructure project monitoring dataset. It details the input features observed during ongoing project monitoring cycles and delineates them strictly from future target outcomes.
+This data dictionary documents the complete schema for the PAIMANA/OCMS-style infrastructure project monitoring dataset. It categorizes fields into **Raw Predictor Features**, **Derived Engineered Features**, and **Quarantined Future Outcome Variables**.
 
 ---
 
-## 1. Candidate Input Features (Observation-Time Data)
+## 1. Raw Input Features (Observation-Time Data)
 
-These features represent project status, administrative metadata, and progress metrics recorded at regular snapshot intervals (e.g. monthly). These are the only features permitted for use by the model at prediction time.
+These features represent project status, administrative metadata, and progress metrics recorded at regular snapshot intervals (e.g. monthly). These are observable at prediction time.
 
-| Field Name | Type | Description | Example / Unit |
-| :--- | :--- | :--- | :--- |
-| `project_id` | String | Unique identifier assigned to the infrastructure project | `"PRJ-2024-001"` |
-| `snapshot_month` | String (YYYY-MM) | Reporting snapshot period for the monitoring record | `"2025-03"` |
-| `ministry` | String | Nodal central ministry overseeing the project | `"Ministry of Road Transport and Highways"` |
-| `sector` | String | Infrastructure sector domain | `"Roads and Highways"`, `"Railways"`, `"Power"` |
-| `implementing_agency`| String | Public sector undertaking or authority executing works | `"NHAI"`, `"RVNL"`, `"NTPC"` |
-| `state` | String | Indian State / Union Territory where work is situated | `"Maharashtra"`, `"Uttar Pradesh"` |
-| `original_cost_cr` | Float | Sanctioned / approved project budget | In ₹ Crores (e.g., `450.75`) |
-| `planned_duration_months` | Integer | Originally approved duration from sanction to completion | In months (e.g., `36`) |
-| `elapsed_months` | Integer | Months passed since project commencement at snapshot date | In months (e.g., `14`) |
-| `physical_progress_pct` | Float | Cumulative physical milestone completion verified on ground | Percentage `0.0` - `100.0` (e.g., `35.5`) |
-| `financial_progress_pct`| Float | Cumulative funds utilized relative to sanctioned budget | Percentage `0.0` - `100.0` (e.g., `42.0`) |
-| `expenditure_cr` | Float | Total cumulative expenditure incurred up to the snapshot date | In ₹ Crores (e.g., `189.32`) |
-| `milestones_total` | Integer | Total scheduled deliverables or contractual milestones | Count (e.g., `12`) |
-| `milestones_delayed` | Integer | Number of scheduled milestones currently behind deadline | Count (e.g., `3`) |
-| `project_status` | Categorical | Current operational reporting status | `"Ongoing"`, `"Delayed"`, `"Critical"`, `"Completed"` |
-
----
-
-## 2. Target Variables (Future Outcomes)
-
-Target variables measure project failure modes or project deviations observed **only after** projects conclude or significantly mature. They are supervised learning labels.
-
-| Target Field | Type | Description | Objective |
-| :--- | :--- | :--- | :--- |
-| `cost_overrun` | Binary / Float | Indicates whether cumulative final cost exceeds sanctioned budget (or percentage overrun $\frac{\text{Final Cost} - \text{Original Cost}}{\text{Original Cost}} \times 100\%$) | Classification (`0` or `1`) or Regression (₹ Cr / %) |
-| `time_overrun` | Binary / Integer | Indicates whether project completion extends beyond scheduled finish date (or delay duration in months) | Classification (`0` or `1`) or Regression (Months) |
+| Field Name | Type | Category | Description | Example / Unit |
+| :--- | :--- | :--- | :--- | :--- |
+| `project_id` | String | Identifier | Unique identifier assigned to the infrastructure project | `"PRJ-0001"` |
+| `snapshot_month` | String (YYYY-MM) | Temporal | Reporting calendar month of the observation | `"2023-07"` |
+| `ministry` | String | Categorical | Nodal central ministry overseeing the project | `"Ministry of Railways"` |
+| `sector` | String | Categorical | Infrastructure sector domain | `"Railways"`, `"Roads and Highways"` |
+| `implementing_agency`| String | Categorical | Public sector authority executing works | `"NHAI"`, `"RVNL"`, `"NTPC"` |
+| `state` | String | Categorical | Indian State / UT where work is situated | `"Maharashtra"`, `"Uttar Pradesh"` |
+| `original_cost_cr` | Float | Numeric | Sanctioned / approved project budget | In ₹ Crores (e.g., `450.75`) |
+| `planned_duration_months` | Integer | Numeric | Originally approved duration from sanction to completion | In months (e.g., `36`) |
+| `elapsed_months` | Integer | Numeric | Months passed since project commencement at snapshot date ($0 < \text{elapsed} \le \text{planned}$) | In months (e.g., `14`) |
+| `physical_progress_pct` | Float | Numeric | Cumulative physical milestone completion verified on ground | Percentage `0.0` - `100.0` |
+| `financial_progress_pct`| Float | Numeric | Cumulative funds utilized relative to sanctioned budget | Percentage `0.0` - `100.0` |
+| `expenditure_cr` | Float | Numeric | Total cumulative expenditure incurred up to the snapshot date | In ₹ Crores (e.g., `189.32`) |
+| `milestones_total` | Integer | Numeric | Total scheduled deliverables or contractual milestones | Count (e.g., `12`) |
+| `milestones_delayed` | Integer | Numeric | Number of scheduled milestones currently behind deadline | Count ($0 \le \text{delayed} \le \text{total}$) |
+| `project_status` | Categorical | Categorical | Operational reporting status at snapshot date | `"Ongoing"`, `"Delayed"`, `"Critical"` |
 
 ---
 
-## 3. Data Leakage Prevention
+## 2. Derived Features (Engineered Domain Signals)
+
+These indicators are mathematically engineered from raw observation-time data to provide non-linear risk signals to the machine learning algorithms.
+
+| Derived Feature Name | Type | Mathematical Formula | Zero-Division Handling | Interpretation |
+| :--- | :--- | :--- | :--- | :--- |
+| `schedule_completion_pct` | Float | $\frac{\text{elapsed\_months}}{\max(\text{planned\_duration\_months}, 1)} \times 100$ | Denominator clipped to $\ge 1$ | Percentage of planned timeline exhausted at snapshot. |
+| `schedule_progress_gap` | Float | $\text{schedule\_completion\_pct} - \text{physical\_progress\_pct}$ | None needed | Slippage gap; positive value indicates delivery is trailing contractual timeline. |
+| `expenditure_burn_gap` | Float | $\text{financial\_progress\_pct} - \text{physical\_progress\_pct}$ | None needed | Capital burn gap; positive value indicates funds exhausted faster than physical assets built. |
+| `milestone_slippage_ratio`| Float | $\frac{\text{milestones\_delayed}}{\max(\text{milestones\_total}, 1)}$ | Denominator clipped to $\ge 1$, clipped $[0, 1]$ | Normalized deliverable bottleneck density. |
+| `budget_utilization_pct` | Float | $\frac{\text{expenditure\_cr}}{\max(\text{original\_cost\_cr}, 10^{-6})} \times 100$ | Denominator clipped to $\ge 10^{-6}$ | Cumulative expenditure as % of sanctioned budget. |
+| `progress_velocity` | Float | $\frac{\Delta \text{physical\_progress\_pct}}{\Delta \text{elapsed\_months}}$ (recent) or $\frac{\text{physical\_progress\_pct}}{\text{elapsed\_months}}$ (cumulative) | Fallback to cumulative pace on snapshot 1 or $\Delta m \le 0$ | Rate of physical completion (% per month). |
+| `cost_velocity` | Float | $\frac{\Delta \text{expenditure\_cr}}{\Delta \text{elapsed\_months}}$ (recent) or $\frac{\text{expenditure\_cr}}{\text{elapsed\_months}}$ (cumulative) | Fallback to cumulative burn on snapshot 1 or $\Delta m \le 0$ | Monthly capital expenditure burn rate (₹ Cr / month). |
+
+---
+
+## 3. Target & Outcome Variables (Quarantined Post-Completion Metrics)
 
 > [!CAUTION]
-> **CRITICAL ARCHITECTURAL RULE: TARGET FIELDS CANNOT BE USED AS INPUT FEATURES**
+> **STRICT DATA LEAKAGE QUARANTINE**
+> All four variables in this table represent information observed **only after** project completion.
+> They are strictly excluded from the predictor matrix $X$ and enforced via automated assertions (`targets.assert_no_leakage(X)`).
 
-### What is Data Leakage?
-Data leakage occurs when information from outside the training dataset (specifically, information from the future that would not be available at the exact moment a prediction is made) is mistakenly included as an input feature during model training.
+| Outcome Field | Type | Role | Description |
+| :--- | :--- | :--- | :--- |
+| `cost_overrun` | Binary (`0` or `1`) | Target Label $y_1$ | `1` if $\text{final\_cost\_cr} > 1.10 \times \text{original\_cost\_cr}$ else `0` *(Prototype threshold)* |
+| `time_overrun` | Binary (`0` or `1`) | Target Label $y_2$ | `1` if $\text{actual\_duration\_months} > 1.10 \times \text{planned\_duration\_months}$ else `0` *(Prototype threshold)* |
+| `final_cost_cr` | Float | Non-Target Outcome | Total actual cumulative expenditure upon final project completion ($\ge \text{expenditure\_cr}$). |
+| `actual_duration_months`| Integer | Non-Target Outcome | Total actual duration from commencement to commissioning ($\ge \text{elapsed\_months}$). |
 
-### Why This Is Dangerous in Infrastructure Monitoring
-1. **False High Performance**: If `cost_overrun` or post-completion figures (e.g., final revised cost, final completion date, post-mortem audit metrics) are present in the feature matrix during training, an ML model will easily correlate these direct indicators and achieve an artificially high metric (e.g., 99% accuracy or $R^2 \approx 1.0$).
-2. **Catastrophic Failure in Production**: When deployed to monitor active ongoing projects (e.g. at month 12 of a 36-month railway project), the future final cost and final completion dates are unknown. A model trained on leaky features cannot function or will produce nonsense predictions on active projects.
-3. **Derived Feature Caution**: Features like $\frac{\text{expenditure\_cr}}{\text{original\_cost\_cr}}$ are valid snapshot metrics *only if* using expenditure incurred up to the snapshot month, not final expenditure. Any feature that computes differences against future revised estimates must be strictly quarantined.
+---
 
-### Pipeline Enforcement
-- **Strict Separation**: During data preprocessing, target columns (`cost_overrun`, `time_overrun`) must be split into a target vector $y$ and removed from the feature matrix $X$.
-- **Temporal Integrity**: When splitting data into train and test sets, splits should ideally be temporal (training on earlier snapshot months, testing on subsequent snapshot months) to prevent look-ahead bias.
+## 4. Feature Groupings for Machine Learning
+
+The Python ML workspace in `ml/src/features.py` defines the following explicit lists:
+
+- **Identifiers**: `ID_COLUMNS = ['project_id', 'snapshot_month']`
+- **Raw Numerical**: `RAW_NUMERIC_FEATURES = ['original_cost_cr', 'planned_duration_months', 'elapsed_months', 'physical_progress_pct', 'financial_progress_pct', 'expenditure_cr', 'milestones_total', 'milestones_delayed']`
+- **Raw Categorical**: `RAW_CATEGORICAL_FEATURES = ['ministry', 'sector', 'implementing_agency', 'state', 'project_status']`
+- **Derived Features**: `DERIVED_FEATURES = ['schedule_completion_pct', 'schedule_progress_gap', 'expenditure_burn_gap', 'milestone_slippage_ratio', 'budget_utilization_pct', 'progress_velocity', 'cost_velocity']`
+- **Predictor Feature Matrix $X$**: `ALL_MODELING_FEATURES = MODELING_NUMERIC_FEATURES (15) + MODELING_CATEGORICAL_FEATURES (5)`
+- **Excluded Columns**: `EXCLUDED_OUTCOME_COLUMNS = ['cost_overrun', 'time_overrun', 'final_cost_cr', 'actual_duration_months']`
