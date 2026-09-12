@@ -104,7 +104,7 @@ export function extractFromCSV(buffer: Buffer, filename: string): ExtractionResu
     const values = parseCSVLine(lines[i])
     if (values.length === 0 || (values.length === 1 && values[0] === '')) continue
 
-    const record: Record<string, any> = {}
+    const record: Record<string, unknown> = {}
     headers.forEach((header, idx) => {
       record[header] = values[idx] !== undefined ? values[idx] : ''
     })
@@ -137,12 +137,13 @@ export function extractFromCSV(buffer: Buffer, filename: string): ExtractionResu
  */
 export function extractFromJSON(buffer: Buffer, filename: string): ExtractionResult {
   const parseWarnings: string[] = []
-  let data: any
+  let data: unknown
 
   try {
     const jsonStr = buffer.toString('utf-8')
     data = JSON.parse(jsonStr)
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err)
     return {
       format: 'JSON',
       filename,
@@ -151,21 +152,22 @@ export function extractFromJSON(buffer: Buffer, filename: string): ExtractionRes
       recordsDetected: 0,
       projectsDetected: 0,
       extractedRecords: [],
-      parseWarnings: [`Malformed JSON syntax: ${err.message}`],
+      parseWarnings: [`Malformed JSON syntax: ${errMsg}`],
     }
   }
 
-  let items: any[] = []
+  let items: unknown[] = []
   if (Array.isArray(data)) {
     items = data
   } else if (typeof data === 'object' && data !== null) {
+    const dataObj = data as Record<string, unknown>
     // Check if wrapped in projects/data property
-    if (Array.isArray(data.projects)) {
-      items = data.projects
-    } else if (Array.isArray(data.data)) {
-      items = data.data
-    } else if (Array.isArray(data.records)) {
-      items = data.records
+    if (Array.isArray(dataObj.projects)) {
+      items = dataObj.projects
+    } else if (Array.isArray(dataObj.data)) {
+      items = dataObj.data
+    } else if (Array.isArray(dataObj.records)) {
+      items = dataObj.records
     } else {
       items = [data]
     }
@@ -176,7 +178,7 @@ export function extractFromJSON(buffer: Buffer, filename: string): ExtractionRes
 
   items.forEach((item, index) => {
     if (typeof item === 'object' && item !== null) {
-      const flattened: Record<string, any> = {}
+      const flattened: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(item)) {
         if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
           // Flatten nested 1-level
@@ -219,7 +221,8 @@ export function extractFromXLSX(buffer: Buffer, filename: string): ExtractionRes
 
   try {
     workbook = XLSX.read(buffer, { type: 'buffer' })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err)
     return {
       format: 'XLSX',
       filename,
@@ -228,7 +231,7 @@ export function extractFromXLSX(buffer: Buffer, filename: string): ExtractionRes
       recordsDetected: 0,
       projectsDetected: 0,
       extractedRecords: [],
-      parseWarnings: [`Failed to parse Excel workbook: ${err.message}`],
+      parseWarnings: [`Failed to parse Excel workbook: ${errMsg}`],
     }
   }
 
@@ -247,13 +250,13 @@ export function extractFromXLSX(buffer: Buffer, filename: string): ExtractionRes
 
   const firstSheetName = workbook.SheetNames[0]
   const worksheet = workbook.Sheets[firstSheetName]
-  const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' })
 
   const extractedRecords: RawExtractedRecord[] = []
   const detectedProjectIds = new Set<string>()
 
   rows.forEach((row, index) => {
-    const cleanedRow: Record<string, any> = {}
+    const cleanedRow: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(row)) {
       cleanedRow[cleanKey(k)] = v
     }
@@ -318,7 +321,7 @@ export function extractFromTextOrMarkdown(
 
       if (cells.length === 0 || cells.every(c => c === '')) continue
 
-      const record: Record<string, any> = {}
+      const record: Record<string, unknown> = {}
       headers.forEach((h, idx) => {
         record[h] = cells[idx] || ''
       })
@@ -349,8 +352,8 @@ export function extractFromTextOrMarkdown(
   // Fallback: Key-Value Dossier Extraction (for single/multi project dossiers in Text/Markdown)
   const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const allLines = normalizedText.split('\n')
-  const records: Record<string, any>[] = []
-  let currentRecord: Record<string, any> = {}
+  const records: Record<string, unknown>[] = []
+  let currentRecord: Record<string, unknown> = {}
 
   for (const rawLine of allLines) {
     const trimmed = rawLine.trim()
@@ -426,7 +429,7 @@ export async function extractFromPDF(buffer: Buffer, filename: string): Promise<
     const parser = new PDFParse({ data: buffer })
     const textData = await parser.getText()
     const text = textData.text || ''
-    const info = await parser.getInfo().catch(() => ({} as any))
+    const info = await parser.getInfo().catch(() => ({} as Record<string, unknown>))
 
     if (!text.trim()) {
       return {
@@ -459,7 +462,8 @@ export async function extractFromPDF(buffer: Buffer, filename: string): Promise<
       },
       parseWarnings: [...parseWarnings, ...textResult.parseWarnings],
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err)
     return {
       format: 'PDF',
       filename,
@@ -468,7 +472,7 @@ export async function extractFromPDF(buffer: Buffer, filename: string): Promise<
       recordsDetected: 0,
       projectsDetected: 0,
       extractedRecords: [],
-      parseWarnings: [`Safe PDF extraction failed: ${err.message}`],
+      parseWarnings: [`Safe PDF extraction failed: ${errMsg}`],
     }
   }
 }

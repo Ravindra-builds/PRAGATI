@@ -35,11 +35,12 @@ export async function POST(req: NextRequest) {
       success: true,
       ...result,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'An error occurred while processing the uploaded file.'
     return NextResponse.json(
       {
         success: false,
-        error: err.message || 'An error occurred while processing the uploaded file.',
+        error: errorMessage,
       },
       { status: 500 }
     )

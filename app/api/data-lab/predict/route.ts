@@ -23,11 +23,12 @@ export async function POST(req: NextRequest) {
       predictionsCount: predictions.length,
       predictions,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'An error occurred while executing ML predictions.'
     return NextResponse.json(
       {
         success: false,
-        error: err.message || 'An error occurred while executing ML predictions.',
+        error: errorMessage,
       },
       { status: 500 }
     )

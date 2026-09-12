@@ -43,11 +43,12 @@ export async function POST(req: NextRequest) {
       message: `Successfully saved ${result.savedProjectsCount} projects and ${result.savedPredictionsCount} predictions to PRAGATI database.`,
       ...result,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'An error occurred while saving the imported dataset.'
     return NextResponse.json(
       {
         success: false,
-        error: err.message || 'An error occurred while saving the imported dataset.',
+        error: errorMessage,
       },
       { status: 500 }
     )

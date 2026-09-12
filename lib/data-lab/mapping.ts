@@ -101,6 +101,10 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
   planned_duration_months: [
     'planned_duration_months',
     'planned_duration',
+    'duration_months',
+    'duration (months)',
+    'duration',
+    'project_duration',
     'contractual_duration',
     'sanctioned_duration',
     'original_duration_months',
@@ -109,6 +113,12 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'approved_duration',
     'original_duration',
     'contract_duration_months',
+    'sanctioned_timeline',
+    'sanctioned_timeline_months',
+    'sanctioned timeline (months)',
+    'timeline (months)',
+    'timeline_months',
+    'timeline',
   ],
   elapsed_months: [
     'elapsed_months',
@@ -204,8 +214,7 @@ export function normalizeFieldName(name: string): string {
  * Maps a single source field to a canonical field key with match confidence.
  */
 export function mapSourceField(
-  sourceField: string,
-  sampleValues: any[] = []
+  sourceField: string
 ): { canonicalField: CanonicalFieldKey | null; confidence: MappingConfidence; matchReason: string } {
   const normSource = normalizeFieldName(sourceField)
   const exactLower = sourceField.trim().toLowerCase()
@@ -280,7 +289,7 @@ export function mapSourceField(
  * Builds the complete mapping summary for an extracted dataset.
  */
 export function buildMappingSummary(
-  rawFieldsList: Record<string, any>[]
+  rawFieldsList: Record<string, unknown>[]
 ): MappingSummary {
   if (rawFieldsList.length === 0) {
     return {
@@ -307,9 +316,9 @@ export function buildMappingSummary(
     const samples = rawFieldsList
       .map(r => r[srcField])
       .filter(v => v !== undefined && v !== null && v !== '')
-      .slice(0, 3)
+      .slice(0, 3) as (string | number | boolean | null | undefined)[]
 
-    const match = mapSourceField(srcField, samples)
+    const match = mapSourceField(srcField)
 
     if (match.canonicalField && !mappedCanonicalSet.has(match.canonicalField)) {
       mappedCanonicalSet.add(match.canonicalField)

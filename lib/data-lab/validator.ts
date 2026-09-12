@@ -10,7 +10,6 @@
 
 import {
   CanonicalProjectRecord,
-  CanonicalFieldKey,
   CANONICAL_FIELDS,
   ValidationReport,
   ValidationErrorItem,

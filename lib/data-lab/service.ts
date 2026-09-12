@@ -242,7 +242,8 @@ export class DataLabService {
             message: w.message,
           })),
         })
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err)
         // Safe fallback if ML inference encounters unexpected error
         results.push({
           recordIndex: i,
@@ -262,7 +263,7 @@ export class DataLabService {
               warningType: 'ML_INFERENCE_WARNING',
               severity: 'LOW',
               title: 'Inference Fallback',
-              message: `Prediction evaluated with standard fallback: ${err.message}`,
+              message: `Prediction evaluated with standard fallback: ${errMsg}`,
             },
           ],
         })
@@ -283,107 +284,117 @@ export class DataLabService {
     let savedProjectsCount = 0
     let savedPredictionsCount = 0
 
-    // Use transaction for atomic consistency
-    await prisma.$transaction(async tx => {
-      for (let i = 0; i < records.length; i++) {
-        const rec = records[i]
-        const pred = predictions.find(p => p.projectId === rec.project_id) || predictions[i]
+    // Execute direct operations to ensure full compatibility with Neon/PgBouncer connection poolers
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i]
+      const pred = predictions.find(p => p.projectId === rec.project_id) || predictions[i]
 
-        // 1. Upsert Project (mark as isSynthetic: false)
-        const project = await tx.project.upsert({
-          where: { projectId: rec.project_id },
-          update: {
-            name: rec.project_name || rec.project_id,
-            ministry: rec.ministry,
-            sector: rec.sector,
-            implementingAgency: rec.implementing_agency,
-            state: rec.state,
-            originalCostCr: rec.original_cost_cr,
-            plannedDurationMonths: rec.planned_duration_months,
-            status: rec.project_status || 'Ongoing',
-            isSynthetic: false, // Explicitly label as imported public/official data
-          },
-          create: {
+      const plannedDuration = Math.round(rec.planned_duration_months ?? (rec.elapsed_months ? rec.elapsed_months + 12 : 36))
+      const elapsedMonths = Math.round(rec.elapsed_months ?? 0)
+      const physicalProgressPct = Number(rec.physical_progress_pct ?? 0)
+      const financialProgressPct = Number(
+        rec.financial_progress_pct ??
+          (rec.original_cost_cr && rec.expenditure_cr ? (rec.expenditure_cr / rec.original_cost_cr) * 100 : 0)
+      )
+      const expenditureCr = Number(rec.expenditure_cr ?? 0)
+      const milestonesTotal = Math.round(rec.milestones_total ?? 0)
+      const milestonesDelayed = Math.round(rec.milestones_delayed ?? 0)
+      const snapshotMonth = rec.snapshot_month || new Date().toISOString().slice(0, 7)
+
+      // 1. Upsert Project (mark as isSynthetic: false)
+      await prisma.project.upsert({
+        where: { projectId: rec.project_id },
+        update: {
+          name: rec.project_name || rec.project_id,
+          ministry: rec.ministry,
+          sector: rec.sector,
+          implementingAgency: rec.implementing_agency,
+          state: rec.state,
+          originalCostCr: Number(rec.original_cost_cr),
+          plannedDurationMonths: plannedDuration,
+          status: rec.project_status || 'Ongoing',
+          isSynthetic: false, // Explicitly label as imported public/official data
+        },
+        create: {
+          projectId: rec.project_id,
+          name: rec.project_name || rec.project_id,
+          ministry: rec.ministry,
+          sector: rec.sector,
+          implementingAgency: rec.implementing_agency,
+          state: rec.state,
+          originalCostCr: Number(rec.original_cost_cr),
+          plannedDurationMonths: plannedDuration,
+          status: rec.project_status || 'Ongoing',
+          isSynthetic: false,
+        },
+      })
+      savedProjectsCount++
+
+      // 2. Upsert ProjectUpdate (snapshot)
+      const update = await prisma.projectUpdate.upsert({
+        where: {
+          projectId_snapshotMonth: {
             projectId: rec.project_id,
-            name: rec.project_name || rec.project_id,
-            ministry: rec.ministry,
-            sector: rec.sector,
-            implementingAgency: rec.implementing_agency,
-            state: rec.state,
-            originalCostCr: rec.original_cost_cr,
-            plannedDurationMonths: rec.planned_duration_months,
-            status: rec.project_status || 'Ongoing',
-            isSynthetic: false,
+            snapshotMonth,
+          },
+        },
+        update: {
+          elapsedMonths,
+          physicalProgressPct,
+          financialProgressPct,
+          expenditureCr,
+          milestonesTotal,
+          milestonesDelayed,
+          projectStatus: rec.project_status || 'Ongoing',
+        },
+        create: {
+          projectId: rec.project_id,
+          snapshotMonth,
+          elapsedMonths,
+          physicalProgressPct,
+          financialProgressPct,
+          expenditureCr,
+          milestonesTotal,
+          milestonesDelayed,
+          projectStatus: rec.project_status || 'Ongoing',
+        },
+      })
+
+      // 3. Create Prediction if exists
+      if (pred) {
+        const predictionRecord = await prisma.prediction.create({
+          data: {
+            projectId: rec.project_id,
+            projectUpdateId: update.id,
+            costOverrunProbability: pred.costOverrunProbability,
+            costPrediction: pred.costPrediction,
+            timeOverrunProbability: pred.timeOverrunProbability,
+            timePrediction: pred.timePrediction,
+            costModelVersion: provenance.modelVersion || 'v1.0-logistic',
+            timeModelVersion: provenance.modelVersion || 'v1.0-rf',
+            overallRiskLevel: pred.overallRiskLevel,
           },
         })
-        savedProjectsCount++
+        savedPredictionsCount++
 
-        // 2. Upsert ProjectUpdate (snapshot)
-        const update = await tx.projectUpdate.upsert({
-          where: {
-            projectId_snapshotMonth: {
-              projectId: rec.project_id,
-              snapshotMonth: rec.snapshot_month,
-            },
-          },
-          update: {
-            elapsedMonths: rec.elapsed_months,
-            physicalProgressPct: rec.physical_progress_pct,
-            financialProgressPct: rec.financial_progress_pct,
-            expenditureCr: rec.expenditure_cr,
-            milestonesTotal: rec.milestones_total,
-            milestonesDelayed: rec.milestones_delayed,
-            projectStatus: rec.project_status || 'Ongoing',
-          },
-          create: {
-            projectId: rec.project_id,
-            snapshotMonth: rec.snapshot_month,
-            elapsedMonths: rec.elapsed_months,
-            physicalProgressPct: rec.physical_progress_pct,
-            financialProgressPct: rec.financial_progress_pct,
-            expenditureCr: rec.expenditure_cr,
-            milestonesTotal: rec.milestones_total,
-            milestonesDelayed: rec.milestones_delayed,
-            projectStatus: rec.project_status || 'Ongoing',
-          },
-        })
-
-        // 3. Create Prediction if exists
-        if (pred) {
-          const predictionRecord = await tx.prediction.create({
-            data: {
-              projectId: rec.project_id,
-              projectUpdateId: update.id,
-              costOverrunProbability: pred.costOverrunProbability,
-              costPrediction: pred.costPrediction,
-              timeOverrunProbability: pred.timeOverrunProbability,
-              timePrediction: pred.timePrediction,
-              costModelVersion: provenance.modelVersion || 'v1.0-logistic',
-              timeModelVersion: provenance.modelVersion || 'v1.0-rf',
-              overallRiskLevel: pred.overallRiskLevel,
-            },
-          })
-          savedPredictionsCount++
-
-          // 4. Create Early Warnings
-          if (pred.earlyWarnings && pred.earlyWarnings.length > 0) {
-            for (const w of pred.earlyWarnings) {
-              await tx.earlyWarning.create({
-                data: {
-                  projectId: rec.project_id,
-                  projectUpdateId: update.id,
-                  predictionId: predictionRecord.id,
-                  warningType: w.warningType,
-                  severity: w.severity,
-                  title: w.title,
-                  message: w.message,
-                },
-              })
-            }
+        // 4. Create Early Warnings
+        if (pred.earlyWarnings && pred.earlyWarnings.length > 0) {
+          for (const w of pred.earlyWarnings) {
+            await prisma.earlyWarning.create({
+              data: {
+                projectId: rec.project_id,
+                projectUpdateId: update.id,
+                predictionId: predictionRecord.id,
+                warningType: w.warningType,
+                severity: w.severity,
+                title: w.title,
+                message: w.message,
+              },
+            })
           }
         }
       }
-    })
+    }
 
     return {
       savedProjectsCount,

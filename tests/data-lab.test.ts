@@ -19,22 +19,18 @@ import {
   extractFromJSON,
   extractFromXLSX,
   extractFromTextOrMarkdown,
-  extractUploadedFile,
 } from '../lib/data-lab/extractors'
 import {
   mapSourceField,
-  buildMappingSummary,
-  FIELD_ALIASES,
 } from '../lib/data-lab/mapping'
 import {
   cleanCurrencyOrFloat,
   cleanPercentage,
   cleanSnapshotMonth,
-  cleanAndNormalizeRecord,
 } from '../lib/data-lab/cleaner'
 import { validateCanonicalRecords } from '../lib/data-lab/validator'
 import { dataLabService } from '../lib/data-lab/service'
-import { CanonicalProjectRecord } from '../lib/data-lab/types'
+import { CanonicalProjectRecord, CleaningTransformation } from '../lib/data-lab/types'
 
 describe('PRAGATI Data Lab - 1. Multi-Format Extraction Suite', () => {
   test('extracts multi-project records accurately from CSV', () => {
@@ -184,7 +180,7 @@ describe('PRAGATI Data Lab - 2. Deterministic Field Mapping Suite', () => {
 
 describe('PRAGATI Data Lab - 3. Cleaning & Normalization Suite', () => {
   test('cleans and normalizes Indian currency strings to ₹ Crores float', () => {
-    const transformations: any[] = []
+    const transformations: CleaningTransformation[] = []
 
     assert.strictEqual(cleanCurrencyOrFloat('₹ 1,250.50 Cr', 'cost', 0, transformations), 1250.5)
     assert.strictEqual(cleanCurrencyOrFloat('125000 Lakhs', 'cost', 1, transformations), 1250.0)
@@ -194,7 +190,7 @@ describe('PRAGATI Data Lab - 3. Cleaning & Normalization Suite', () => {
   })
 
   test('normalizes percentage strings and decimal fractions to 0.0 - 100.0', () => {
-    const transformations: any[] = []
+    const transformations: CleaningTransformation[] = []
 
     assert.strictEqual(cleanPercentage('63.5 %', 'progress', 0, transformations), 63.5)
     assert.strictEqual(cleanPercentage('45.0%', 'progress', 1, transformations), 45.0)
@@ -203,7 +199,7 @@ describe('PRAGATI Data Lab - 3. Cleaning & Normalization Suite', () => {
   })
 
   test('normalizes observation dates into YYYY-MM snapshot format', () => {
-    const transformations: any[] = []
+    const transformations: CleaningTransformation[] = []
 
     assert.strictEqual(cleanSnapshotMonth('2025-06-15', 'month', 0, transformations), '2025-06')
     assert.strictEqual(cleanSnapshotMonth('06/2025', 'month', 1, transformations), '2025-06')

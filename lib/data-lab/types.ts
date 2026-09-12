@@ -24,7 +24,7 @@ export interface CanonicalProjectRecord {
   project_status: string
   // Optional display metadata
   project_name?: string
-  unmapped_fields?: Record<string, any>
+  unmapped_fields?: Record<string, unknown>
 }
 
 export type CanonicalFieldKey = keyof Omit<CanonicalProjectRecord, 'unmapped_fields'>
@@ -185,7 +185,7 @@ export interface FieldMapping {
   canonicalField: CanonicalFieldKey | null
   confidence: MappingConfidence
   matchReason: string
-  sampleValues: any[]
+  sampleValues: (string | number | boolean | null | undefined)[]
 }
 
 export interface MappingSummary {
@@ -201,8 +201,8 @@ export interface CleaningTransformation {
   recordIndex: number
   projectId?: string
   field: string
-  originalValue: any
-  cleanedValue: any
+  originalValue: unknown
+  cleanedValue: unknown
   rule: string
 }
 
@@ -219,7 +219,7 @@ export interface ValidationErrorItem {
   recordIndex: number
   projectId?: string
   field: string
-  value: any
+  value: unknown
   message: string
   isCritical: boolean
 }
@@ -228,7 +228,7 @@ export interface ValidationWarningItem {
   recordIndex: number
   projectId?: string
   field: string
-  value: any
+  value: unknown
   message: string
 }
 
@@ -247,7 +247,7 @@ export type SupportedFormat = 'PDF' | 'CSV' | 'XLSX' | 'JSON' | 'TXT' | 'MD'
 
 export interface RawExtractedRecord {
   recordIndex: number
-  rawFields: Record<string, any>
+  rawFields: Record<string, unknown>
   extractedTextPreview?: string
 }
 
@@ -259,7 +259,7 @@ export interface ExtractionResult {
   recordsDetected: number
   projectsDetected: number
   extractedRecords: RawExtractedRecord[]
-  documentMetadata?: Record<string, any>
+  documentMetadata?: Record<string, unknown>
   parseWarnings: string[]
 }
 
@@ -287,14 +287,14 @@ export interface DataLabPredictionResult {
   costDrivers: Array<{
     feature: string
     displayName: string
-    value: any
+    value: unknown
     contribution: number
     direction: string
   }>
   timeDrivers: Array<{
     feature: string
     displayName: string
-    value: any
+    value: unknown
     contribution: number
     direction: string
   }>

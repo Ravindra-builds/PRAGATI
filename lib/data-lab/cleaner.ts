@@ -13,14 +13,13 @@ import {
   CanonicalProjectRecord,
   CanonicalFieldKey,
   CleaningTransformation,
-  CleaningReport,
 } from './types'
 
 /**
  * Normalizes currency and numeric string inputs into float in ₹ Crores.
  */
 export function cleanCurrencyOrFloat(
-  rawVal: any,
+  rawVal: unknown,
   fieldName: string,
   recordIndex: number,
   transformations: CleaningTransformation[]
@@ -77,7 +76,7 @@ export function cleanCurrencyOrFloat(
  * Normalizes percentage strings and fractions into 0.0 - 100.0 range.
  */
 export function cleanPercentage(
-  rawVal: any,
+  rawVal: unknown,
   fieldName: string,
   recordIndex: number,
   transformations: CleaningTransformation[]
@@ -139,7 +138,7 @@ export function cleanPercentage(
  * Normalizes dates to YYYY-MM snapshot format.
  */
 export function cleanSnapshotMonth(
-  rawVal: any,
+  rawVal: unknown,
   fieldName: string,
   recordIndex: number,
   transformations: CleaningTransformation[]
@@ -213,7 +212,7 @@ export function cleanSnapshotMonth(
  * Normalizes integer count fields.
  */
 export function cleanInteger(
-  rawVal: any,
+  rawVal: unknown,
   fieldName: string,
   recordIndex: number,
   transformations: CleaningTransformation[]
@@ -250,7 +249,7 @@ export function cleanInteger(
  * Normalizes a raw extracted record into a clean canonical project record candidate.
  */
 export function cleanAndNormalizeRecord(
-  rawRecord: Record<string, any>,
+  rawRecord: Record<string, unknown>,
   mapping: Record<string, CanonicalFieldKey>,
   recordIndex: number,
   transformations: CleaningTransformation[]
@@ -298,7 +297,12 @@ export function cleanAndNormalizeRecord(
     }
   }
 
-  // 2. Collect unmapped fields
+  // 2. Ensure observation date / snapshot_month defaults if omitted from public report
+  if (!result.snapshot_month) {
+    result.snapshot_month = cleanSnapshotMonth(null, 'snapshot_month', recordIndex, transformations)
+  }
+
+  // 3. Collect unmapped fields
   for (const [srcKey, rawVal] of Object.entries(rawRecord)) {
     if (!mapping[srcKey]) {
       result.unmapped_fields![srcKey] = rawVal
