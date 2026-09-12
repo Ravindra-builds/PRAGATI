@@ -287,6 +287,68 @@ Observation Month: 2025-06`,
   },
 ]
 
+interface ApiResponse {
+  success: boolean
+  error?: string
+  [key: string]: unknown
+}
+
+/**
+ * Defensive JSON fetch helper that inspects raw text first.
+ * Prevents cryptic "Unexpected end of JSON input" errors when a server
+ * crashes, times out, or returns an empty or HTML response.
+ */
+async function safeFetchJson<T extends ApiResponse>(
+  url: string,
+  options?: RequestInit
+): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(url, options)
+  } catch (netErr: unknown) {
+    const msg = netErr instanceof Error ? netErr.message : 'Network connection failed'
+    throw new Error(`Unable to reach server (${url}): ${msg}. Please verify your connection.`)
+  }
+
+  const rawText = await res.text()
+
+  let parsed: T | null = null
+  if (rawText && rawText.trim().length > 0) {
+    try {
+      parsed = JSON.parse(rawText) as T
+    } catch {
+      // Server returned HTML (e.g. 500/502/504 error page from host or reverse proxy)
+      const cleanSnippet = rawText
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 160)
+      throw new Error(
+        `Server returned non-JSON response (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}): ${cleanSnippet || 'Empty HTML body'}`
+      )
+    }
+  }
+
+  if (!res.ok) {
+    const errorMsg =
+      parsed?.error ||
+      `Server request failed with HTTP status ${res.status}${res.statusText ? ` (${res.statusText})` : ''}.`
+    throw new Error(errorMsg)
+  }
+
+  if (!parsed) {
+    throw new Error(
+      `Server returned an empty response (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}).`
+    )
+  }
+
+  if (!parsed.success) {
+    throw new Error(parsed.error || 'Server indicated failure without specific error message.')
+  }
+
+  return parsed
+}
+
 export default function DataLabPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const errorRef = useRef<HTMLDivElement>(null)
@@ -432,15 +494,18 @@ export default function DataLabPage() {
         formData.append('mappingOverrides', JSON.stringify(overrides))
       }
 
-      const res = await fetch('/api/data-lab/parse', {
+      interface ParsePayload extends ApiResponse {
+        extraction: ExtractionResult
+        mappingSummary: MappingSummary
+        cleaningReport: CleaningReport
+        validationReport: ValidationReport
+        canonicalRecords: Partial<CanonicalProjectRecord>[]
+      }
+
+      const data = await safeFetchJson<ParsePayload>('/api/data-lab/parse', {
         method: 'POST',
         body: formData,
       })
-
-      const data = await res.json()
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to process file.')
-      }
 
       setExtraction(data.extraction)
       setMappingSummary(data.mappingSummary)
@@ -484,16 +549,15 @@ export default function DataLabPage() {
     try {
       const validRecords = canonicalRecords.filter(r => r.project_id && r.original_cost_cr)
 
-      const res = await fetch('/api/data-lab/predict', {
+      interface PredictPayload extends ApiResponse {
+        predictions: DataLabPredictionResult[]
+      }
+
+      const data = await safeFetchJson<PredictPayload>('/api/data-lab/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: validRecords }),
       })
-
-      const data = await res.json()
-      if (!data.success) {
-        throw new Error(data.error || 'ML Prediction failed.')
-      }
 
       setPredictions(data.predictions)
       setIsMappingExpanded(false) // Auto-minimize mapping matrix so government official immediately sees risk analysis!
@@ -526,7 +590,12 @@ export default function DataLabPage() {
         modelVersion: 'v1.0-dual-target',
       }
 
-      const res = await fetch('/api/data-lab/save', {
+      interface SavePayload extends ApiResponse {
+        savedProjectsCount: number
+        savedPredictionsCount: number
+      }
+
+      const data = await safeFetchJson<SavePayload>('/api/data-lab/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -535,11 +604,6 @@ export default function DataLabPage() {
           provenance,
         }),
       })
-
-      const data = await res.json()
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to save dataset.')
-      }
 
       setIsSaved(true)
       setSaveSuccessMessage(

@@ -7,7 +7,6 @@
 
 import crypto from 'crypto'
 import * as XLSX from 'xlsx'
-import { PDFParse } from 'pdf-parse'
 import {
   SupportedFormat,
   ExtractionResult,
@@ -426,10 +425,26 @@ export async function extractFromPDF(buffer: Buffer, filename: string): Promise<
   const parseWarnings: string[] = []
 
   try {
-    const parser = new PDFParse({ data: buffer })
+    // Lazily import pdf-parse to avoid loading native @napi-rs/canvas on module initialization
+    const pdfParseModule = await import('pdf-parse')
+    type ParserCtor = new (options: { data: Buffer }) => {
+      getText: () => Promise<{ text?: string; total?: number }>
+      getInfo?: () => Promise<unknown>
+    }
+    const rawExport =
+      pdfParseModule.PDFParse ||
+      (pdfParseModule as unknown as { default?: { PDFParse?: unknown } }).default?.PDFParse ||
+      (pdfParseModule as unknown as { default?: unknown }).default
+    const ParserClass = rawExport as unknown as ParserCtor
+
+    if (!ParserClass) {
+      throw new Error('PDFParse class could not be resolved from module exports.')
+    }
+
+    const parser = new ParserClass({ data: buffer })
     const textData = await parser.getText()
     const text = textData.text || ''
-    const info = await parser.getInfo().catch(() => ({} as Record<string, unknown>))
+    const info = typeof parser.getInfo === 'function' ? await parser.getInfo().catch(() => ({})) : {}
 
     if (!text.trim()) {
       return {
@@ -472,7 +487,9 @@ export async function extractFromPDF(buffer: Buffer, filename: string): Promise<
       recordsDetected: 0,
       projectsDetected: 0,
       extractedRecords: [],
-      parseWarnings: [`Safe PDF extraction failed: ${errMsg}`],
+      parseWarnings: [
+        `Safe PDF extraction notice: ${errMsg}. For optimal serverless performance, please upload CSV, Excel (XLSX), JSON, or Markdown reports.`,
+      ],
     }
   }
 }

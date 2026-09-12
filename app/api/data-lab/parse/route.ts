@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     if (!file) {
       return NextResponse.json(
-        { error: 'No file provided in request.' },
+        { success: false, error: 'No file provided in request.' },
         { status: 400 }
       )
     }
@@ -26,8 +26,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const filename = file.name || 'uploaded_document.csv'
+    let buffer: Buffer
+    let filename = 'uploaded_document.csv'
+
+    if (typeof file === 'string') {
+      buffer = Buffer.from(file, 'utf-8')
+    } else if (file && typeof (file as unknown as Blob).arrayBuffer === 'function') {
+      buffer = Buffer.from(await (file as unknown as Blob).arrayBuffer())
+      filename = (file as File).name || filename
+    } else {
+      return NextResponse.json(
+        { success: false, error: 'Received invalid file payload format.' },
+        { status: 400 }
+      )
+    }
 
     const result = await dataLabService.processUpload(buffer, filename, customOverrides)
 
@@ -37,6 +49,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'An error occurred while processing the uploaded file.'
+    console.error('[/api/data-lab/parse error]:', err)
     return NextResponse.json(
       {
         success: false,
