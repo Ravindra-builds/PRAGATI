@@ -14,6 +14,7 @@ import {
   X,
   Compass,
   Bot,
+  FileSpreadsheet,
 } from 'lucide-react'
 
 interface NavLinkItem {
@@ -54,6 +55,12 @@ export function Navbar() {
       label: 'Alerts',
       icon: Bell,
       active: pathname.startsWith('/dashboard/alerts'),
+    },
+    {
+      href: '/dashboard/data-lab',
+      label: 'Data Lab',
+      icon: FileSpreadsheet,
+      active: pathname.startsWith('/dashboard/data-lab'),
     },
     {
       href: '/dashboard/assistant',

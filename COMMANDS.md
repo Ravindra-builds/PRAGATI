@@ -856,7 +856,27 @@ git status
 
 ---
 
-# 17. Command Safety Notes
+# 18. PRAGATI Data Lab Commands
+
+The **PRAGATI Data Lab** enables ingestion, deterministic field mapping, cleaning, and ML inference on external public/official project reports.
+
+### Run Data Lab Tests
+```bash
+# Run all backend and Data Lab tests
+npm run test:backend
+```
+- **What it does**: Executes unit and integration test suites for CSV, JSON, XLSX, TXT, MD, and PDF extraction, field mapping, currency normalizers, anti-leakage quarantine, and live ML inference.
+- **Expected output**: `✔ PRAGATI Data Lab ... (pass 59, fail 0)`.
+
+### Testing Local Data Lab File Upload via cURL
+```bash
+# Test Data Lab parsing endpoint with a sample CSV file
+curl.exe -F "file=@data/sample.csv" http://localhost:3000/api/data-lab/parse
+```
+
+---
+
+# 19. Command Safety Notes
 
 | Command | Modifies Dataset? | Retrains Models? | Overwrites Files? | Destructive Risk |
 | :--- | :---: | :---: | :---: | :--- |
@@ -870,10 +890,11 @@ git status
 | `uvicorn ml.api.main:app --port 8000` | No | No | None (Stateless inference server) | **Zero** (Completely safe) |
 | `python -m unittest discover -s ml/tests` | No | No | None (Read-only) | **Zero** (Completely safe) |
 | `npm run dev` / `npm run build` | No | No | Overwrites `.next/` cache | **Zero** (Standard web builds) |
+| `npm run test:backend` | No | No | None (Read-only test execution) | **Zero** (Completely safe) |
 | `git push --force` | No | No | Overwrites remote repository history | **HIGH DANGER** (Never use `--force` unless instructed) |
 
 ---
 
-*Last verified: 2026-09-11*
+*Last verified: 2026-09-12*
 
-> *Note: This document is continuously updated as new backend, database, ML-service, and deployment commands are introduced.*
+> *Note: This document is continuously updated as new backend, database, ML-service, Data Lab, and deployment commands are introduced.*

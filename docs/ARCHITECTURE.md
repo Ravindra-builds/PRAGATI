@@ -189,3 +189,56 @@ Application Database (PostgreSQL) FastAPI ML Inference     LLM Provider Layer
    All user-supplied text and retrieved database fields are quarantined in `<untrusted_retrieved_data>` tags, with strict system prompt defenses prohibiting code execution, prompt extraction, or role overrides.
 7. **Advisory Recommendation Verbs**:
    The AI assistant is hardcoded to suggest only institutional oversight and verification actions (`review`, `investigate`, `verify`, `audit`, `clarify`), strictly forbidding imperative administrative orders.
+
+---
+
+## 6. PRAGATI Data Lab Architecture & Ingestion Flow
+
+The **Data Lab** allows external public project dossiers and datasets (PDF, CSV, XLSX, JSON, TXT, MD) to be extracted, validated, and processed through the **existing trained ML pipeline** without duplicating model code.
+
+```text
+                               DATA LAB
+                                  │
+                             File Upload
+                                  │
+                                  ▼
+                           Format Detection
+                                  │
+                                  ▼
+                              Extraction
+                                  │
+                                  ▼
+                            Schema Mapping
+                                  │
+                                  ▼
+                              Validation
+                                  │
+                                  ▼
+                       Cleaning / Normalization
+                                  │
+                                  ▼
+                       Canonical Project Schema
+                                  │
+                                  ▼
+                         Existing ML Pipeline
+                                  │
+                                  ▼
+                              Prediction
+                                  │
+                                  ▼
+                           SHAP Explanation
+                                  │
+                                  ▼
+                               Preview
+                                  │
+                                  ▼
+                            Optional Save
+                                  │
+                                  ▼
+                             PostgreSQL
+```
+
+### Architectural Safeguards in Data Lab:
+1. **Single Source of Truth for ML**: Uploaded records use the existing FastAPI microservice and model artifacts without creating a secondary preprocessing path.
+2. **Anti-Leakage Quarantine**: Future outcome columns are detected, flagged in validation warnings, and quarantined from the ML payload.
+3. **Explicit Provenance**: Persisted records are marked with `is_synthetic: false` and accompanied by SHA-256 source hash and metadata.
