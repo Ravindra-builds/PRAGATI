@@ -81,19 +81,33 @@ export function AnalyticsHeader({
       </div>
 
       {/* Global Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 shadow-xs">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wide mr-1">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            <span>Filters:</span>
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wide">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
+            <span>Portfolio Filters</span>
           </div>
 
+          {/* Reset Filters */}
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset Filters</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           {/* Ministry Filter */}
-          <div className="flex-1 min-w-[180px]">
+          <div>
             <select
               value={ministry}
               onChange={(e) => setMinistry(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               aria-label="Filter by Ministry"
             >
               <option value="ALL">All Ministries</option>
@@ -106,11 +120,11 @@ export function AnalyticsHeader({
           </div>
 
           {/* Sector Filter */}
-          <div className="flex-1 min-w-[180px]">
+          <div>
             <select
               value={sector}
               onChange={(e) => setSector(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               aria-label="Filter by Sector"
             >
               <option value="ALL">All Sectors</option>
@@ -123,11 +137,11 @@ export function AnalyticsHeader({
           </div>
 
           {/* State Filter */}
-          <div className="flex-1 min-w-[160px]">
+          <div>
             <select
               value={state}
               onChange={(e) => setState(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               aria-label="Filter by State"
             >
               <option value="ALL">All States</option>
@@ -140,11 +154,11 @@ export function AnalyticsHeader({
           </div>
 
           {/* Risk Tier Filter */}
-          <div className="w-full sm:w-auto min-w-[140px]">
+          <div>
             <select
               value={risk}
               onChange={(e) => setRisk(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               aria-label="Filter by Risk Tier"
             >
               <option value="ALL">All Risk Tiers</option>
@@ -154,18 +168,6 @@ export function AnalyticsHeader({
               <option value="LOW">Low Risk Only</option>
             </select>
           </div>
-
-          {/* Reset Filters */}
-          {isFiltered && (
-            <button
-              type="button"
-              onClick={onReset}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset</span>
-            </button>
-          )}
         </div>
       </div>
     </div>

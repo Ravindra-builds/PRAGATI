@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
 } from 'lucide-react'
 import { RiskBadge, RiskTier } from '@/components/ui/RiskBadge'
 import { TableSkeleton } from '@/components/ui/Skeleton'
@@ -236,16 +237,17 @@ export default function ProjectsDirectoryPage() {
           selectedSector !== 'ALL' ||
           selectedStatus !== 'ALL' ||
           selectedRisk !== 'ALL') && (
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs text-slate-500">
             <div>
               Showing filtered results ({total} matching projects)
             </div>
             <button
               type="button"
               onClick={handleResetFilters}
-              className="text-xs text-blue-700 hover:text-blue-900 font-semibold underline"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors self-start sm:self-auto cursor-pointer"
             >
-              Clear all filters
+              <RotateCcw className="w-3 h-3" />
+              <span>Clear all filters</span>
             </button>
           </div>
         )}

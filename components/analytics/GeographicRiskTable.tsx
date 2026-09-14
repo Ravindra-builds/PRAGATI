@@ -78,8 +78,8 @@ export function GeographicRiskTable({
         </div>
 
         {/* Search */}
-        <div className="flex items-center gap-2">
-          <div className="relative w-48 sm:w-56">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-56">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -93,9 +93,9 @@ export function GeographicRiskTable({
             <button
               type="button"
               onClick={() => onSelectState('ALL')}
-              className="text-xs text-blue-600 hover:text-blue-800 font-medium underline shrink-0"
+              className="px-2 py-1 rounded text-xs text-blue-600 hover:text-blue-800 bg-blue-50 shrink-0 cursor-pointer"
             >
-              Clear Filter
+              Clear filter
             </button>
           )}
         </div>

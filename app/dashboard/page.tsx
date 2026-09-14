@@ -12,6 +12,7 @@ import {
   Filter,
   RefreshCw,
   CheckCircle2,
+  RotateCcw,
 } from 'lucide-react'
 import { RiskBadge, RiskTier } from '@/components/ui/RiskBadge'
 import { StatCard } from '@/components/ui/StatCard'
@@ -166,19 +167,34 @@ export default function DashboardPage() {
       </div>
 
       {/* Lightweight Filter Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 uppercase tracking-wider">
             <Filter className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>Filters:</span>
+            <span>Portfolio Filters</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 flex-1">
-            {/* Sector filter */}
+          {(selectedSector !== 'ALL' ||
+            selectedMinistry !== 'ALL' ||
+            selectedState !== 'ALL') && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Clear Filters</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Sector filter */}
+          <div>
             <select
               value={selectedSector}
               onChange={(e) => setSelectedSector(e.target.value)}
-              className="h-9 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="w-full h-9 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-medium"
               aria-label="Filter by Sector"
             >
               <option value="ALL">All Sectors</option>
@@ -188,12 +204,14 @@ export default function DashboardPage() {
                 </option>
               ))}
             </select>
+          </div>
 
-            {/* Ministry filter */}
+          {/* Ministry filter */}
+          <div>
             <select
               value={selectedMinistry}
               onChange={(e) => setSelectedMinistry(e.target.value)}
-              className="h-9 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500 max-w-xs truncate"
+              className="w-full h-9 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-medium"
               aria-label="Filter by Ministry"
             >
               <option value="ALL">All Ministries</option>
@@ -203,12 +221,14 @@ export default function DashboardPage() {
                 </option>
               ))}
             </select>
+          </div>
 
-            {/* State filter */}
+          {/* State filter */}
+          <div>
             <select
               value={selectedState}
               onChange={(e) => setSelectedState(e.target.value)}
-              className="h-9 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="w-full h-9 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-medium"
               aria-label="Filter by State"
             >
               <option value="ALL">All States</option>
@@ -218,18 +238,6 @@ export default function DashboardPage() {
                 </option>
               ))}
             </select>
-
-            {(selectedSector !== 'ALL' ||
-              selectedMinistry !== 'ALL' ||
-              selectedState !== 'ALL') && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="text-xs text-blue-700 hover:text-blue-900 font-medium underline px-1"
-              >
-                Clear Filters
-              </button>
-            )}
           </div>
         </div>
       </div>

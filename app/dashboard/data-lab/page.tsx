@@ -643,7 +643,7 @@ export default function DataLabPage() {
   const activeRecord = canonicalRecords[selectedProjectIndex]
 
   return (
-    <div className="space-y-6 pb-16 relative">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 pb-16 relative">
       {/* Header & Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
@@ -660,13 +660,13 @@ export default function DataLabPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto self-start sm:self-auto">
           {/* If file or sample loaded, show both Back and Reset buttons */}
           {(extraction || currentStage > 1) && (
             <>
               <button
                 onClick={handleReset}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
                 title="Return to initial upload view"
               >
                 <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
@@ -675,7 +675,7 @@ export default function DataLabPage() {
 
               <button
                 onClick={handleReset}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
                 title="Clear current data and start fresh"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
@@ -687,7 +687,7 @@ export default function DataLabPage() {
           {/* Toggle Official Project Data Checklist (Government Guide) */}
           <button
             onClick={() => setShowSchemaGuide(prev => !prev)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
           >
             <Info className="w-3.5 h-3.5 text-blue-600" />
             <span>{showSchemaGuide ? 'Hide Data Checklist' : 'Official Data Checklist'}</span>
