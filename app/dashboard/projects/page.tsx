@@ -14,6 +14,7 @@ import { RiskBadge, RiskTier } from '@/components/ui/RiskBadge'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
+import { StateProjectsSection } from '@/components/projects/StateProjectsSection'
 
 interface ProjectItem {
   id: string
@@ -65,6 +66,7 @@ export default function ProjectsDirectoryPage() {
   const [selectedSector, setSelectedSector] = useState('ALL')
   const [selectedStatus, setSelectedStatus] = useState('ALL')
   const [selectedRisk, setSelectedRisk] = useState('ALL')
+  const [selectedState, setSelectedState] = useState('ALL')
   const [page, setPage] = useState(1)
   const pageSize = 20
 
@@ -89,6 +91,7 @@ export default function ProjectsDirectoryPage() {
       if (selectedSector !== 'ALL') params.set('sector', selectedSector)
       if (selectedStatus !== 'ALL') params.set('status', selectedStatus)
       if (selectedRisk !== 'ALL') params.set('risk', selectedRisk)
+      if (selectedState !== 'ALL') params.set('state', selectedState)
 
       const res = await fetch(`/api/projects?${params.toString()}`)
       if (!res.ok) {
@@ -102,7 +105,7 @@ export default function ProjectsDirectoryPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, debouncedQuery, selectedSector, selectedStatus, selectedRisk])
+  }, [page, debouncedQuery, selectedSector, selectedStatus, selectedRisk, selectedState])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -117,6 +120,7 @@ export default function ProjectsDirectoryPage() {
     setSelectedSector('ALL')
     setSelectedStatus('ALL')
     setSelectedRisk('ALL')
+    setSelectedState('ALL')
     setPage(1)
   }
 
@@ -157,6 +161,18 @@ export default function ProjectsDirectoryPage() {
           <span>Refresh List</span>
         </button>
       </div>
+
+      {/* State-wise Projects & Geospatial Telemetry (MoSPI PAIMANA Baseline) */}
+      <StateProjectsSection
+        activeFilterState={selectedState}
+        onSelectFilterState={(st) => {
+          setSelectedState(st)
+          setPage(1)
+        }}
+      />
+
+      {/* Anchor for smooth scroll from state card */}
+      <div id="project-directory-table" className="pt-2" />
 
       {/* Lightweight Filter Toolbar: consistent h-9 controls */}
       <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-2.5">
@@ -236,10 +252,27 @@ export default function ProjectsDirectoryPage() {
         {(debouncedQuery ||
           selectedSector !== 'ALL' ||
           selectedStatus !== 'ALL' ||
-          selectedRisk !== 'ALL') && (
+          selectedRisk !== 'ALL' ||
+          selectedState !== 'ALL') && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs text-slate-500">
-            <div>
-              Showing filtered results ({total} matching projects)
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Showing filtered results ({total} matching projects)</span>
+              {selectedState !== 'ALL' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                  <span>State: {selectedState}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedState('ALL')
+                      setPage(1)
+                    }}
+                    className="hover:text-rose-700 font-bold ml-1 cursor-pointer text-slate-400 hover:text-rose-600"
+                    title="Remove state filter"
+                  >
+                    &times;
+                  </button>
+                </span>
+              )}
             </div>
             <button
               type="button"

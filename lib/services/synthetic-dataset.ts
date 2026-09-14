@@ -91,6 +91,10 @@ export interface StateAnalyticsItem {
   avgCostRisk: number
   avgTimeRisk: number
   totalSanctionedCostCr: number
+  totalExpenditureCr: number
+  avgPhysicalProgress: number
+  avgFinancialProgress: number
+  avgBurnGap: number
 }
 
 export interface ProgressScatterPoint {
@@ -824,6 +828,9 @@ class SyntheticDatasetService {
         costProbSum: number
         timeProbSum: number
         costCr: number
+        expCr: number
+        phyProgressSum: number
+        finProgressSum: number
       }
     >()
 
@@ -922,6 +929,9 @@ class SyntheticDatasetService {
           costProbSum: 0,
           timeProbSum: 0,
           costCr: 0,
+          expCr: 0,
+          phyProgressSum: 0,
+          finProgressSum: 0,
         })
       }
       const stItem = stateMap.get(st)!
@@ -933,6 +943,11 @@ class SyntheticDatasetService {
       stItem.costProbSum += costProb
       stItem.timeProbSum += timeProb
       stItem.costCr += p.originalCostCr
+      if (p.latestUpdate) {
+        stItem.expCr += p.latestUpdate.expenditureCr || 0
+        stItem.phyProgressSum += p.latestUpdate.physicalProgressPct || 0
+        stItem.finProgressSum += p.latestUpdate.financialProgressPct || 0
+      }
 
       // Scatter Points
       if (p.latestUpdate) {
@@ -1000,17 +1015,25 @@ class SyntheticDatasetService {
       .sort((a, b) => b.totalProjects - a.totalProjects)
 
     const byState: StateAnalyticsItem[] = Array.from(stateMap.entries())
-      .map(([state, d]) => ({
-        state,
-        totalProjects: d.total,
-        critical: d.critical,
-        high: d.high,
-        medium: d.medium,
-        low: d.low,
-        avgCostRisk: d.total > 0 ? Math.round((d.costProbSum / d.total) * 1000) / 1000 : 0,
-        avgTimeRisk: d.total > 0 ? Math.round((d.timeProbSum / d.total) * 1000) / 1000 : 0,
-        totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
-      }))
+      .map(([state, d]) => {
+        const avgPhy = d.total > 0 ? Math.round((d.phyProgressSum / d.total) * 10) / 10 : 0
+        const avgFin = d.total > 0 ? Math.round((d.finProgressSum / d.total) * 10) / 10 : 0
+        return {
+          state,
+          totalProjects: d.total,
+          critical: d.critical,
+          high: d.high,
+          medium: d.medium,
+          low: d.low,
+          avgCostRisk: d.total > 0 ? Math.round((d.costProbSum / d.total) * 1000) / 1000 : 0,
+          avgTimeRisk: d.total > 0 ? Math.round((d.timeProbSum / d.total) * 1000) / 1000 : 0,
+          totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
+          totalExpenditureCr: Math.round(d.expCr * 10) / 10,
+          avgPhysicalProgress: avgPhy,
+          avgFinancialProgress: avgFin,
+          avgBurnGap: Math.round((avgFin - avgPhy) * 10) / 10,
+        }
+      })
       .sort(
         (a, b) =>
           b.critical + b.high - (a.critical + a.high) || b.totalProjects - a.totalProjects
