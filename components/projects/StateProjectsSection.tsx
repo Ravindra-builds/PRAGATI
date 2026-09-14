@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Building2,
   IndianRupee,
@@ -17,6 +17,8 @@ import {
   BarChart3,
   Flame,
   ArrowRight,
+  Search,
+  Check,
 } from 'lucide-react'
 import { StateAnalyticsItem } from '@/lib/services/synthetic-dataset'
 import { IndiaStateMap, MetricMode } from './IndiaStateMap'
@@ -24,6 +26,128 @@ import { IndiaStateMap, MetricMode } from './IndiaStateMap'
 interface StateProjectsSectionProps {
   activeFilterState: string
   onSelectFilterState: (state: string) => void
+}
+
+function StateDropdown({
+  states,
+  selectedState,
+  onSelectState,
+}: {
+  states: StateAnalyticsItem[]
+  selectedState: string
+  onSelectState: (state: string) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleKeyDown)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return states
+    const q = query.toLowerCase()
+    return states.filter((s) => s.state.toLowerCase().includes(q))
+  }, [states, query])
+
+  const selectedItem = states.find(
+    (s) => s.state.toLowerCase() === selectedState.toLowerCase()
+  )
+
+  return (
+    <div className="relative w-full sm:w-80" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 flex items-center justify-between gap-2 shadow-2xs hover:border-blue-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
+        <span className="truncate">
+          {selectedState} {selectedItem ? `(${selectedItem.totalProjects} projects)` : ''}
+        </span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-500 transition-transform ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in duration-100">
+          {/* Search Header */}
+          <div className="p-2 border-b border-slate-100 bg-slate-50/70">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search state or UT..."
+                className="w-full h-8 pl-8 pr-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* List options */}
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 py-1" role="listbox">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-4 text-center text-xs text-slate-400">
+                No matching state found
+              </div>
+            ) : (
+              filtered.map((s) => {
+                const isSelected = s.state.toLowerCase() === selectedState.toLowerCase()
+                return (
+                  <button
+                    key={s.state}
+                    type="button"
+                    onClick={() => {
+                      onSelectState(s.state)
+                      setIsOpen(false)
+                      setQuery('')
+                    }}
+                    className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50 text-blue-900 font-semibold'
+                        : 'hover:bg-slate-50 text-slate-700 font-medium'
+                    }`}
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <span className="truncate">{s.state}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                        {s.totalProjects} {s.totalProjects === 1 ? 'proj' : 'projs'}
+                      </span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function StateProjectsSection({
@@ -36,10 +160,18 @@ export function StateProjectsSection({
   const [stateList, setStateList] = useState<StateAnalyticsItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Fetch portfolio state analytics
+  // Synchronize state when activeFilterState prop changes from parent without cascading render
+  const [prevActiveFilterState, setPrevActiveFilterState] = useState(activeFilterState)
+  if (activeFilterState !== prevActiveFilterState) {
+    setPrevActiveFilterState(activeFilterState)
+    if (activeFilterState && activeFilterState !== 'ALL') {
+      setSelectedState(activeFilterState)
+    }
+  }
+
+  // Fetch portfolio state analytics once on initial mount
   useEffect(() => {
     let isMounted = true
-    setLoading(true)
 
     fetch('/api/analytics')
       .then((res) => res.json())
@@ -47,11 +179,8 @@ export function StateProjectsSection({
         if (isMounted && json.success && json.data?.byState) {
           setStateList(json.data.byState)
 
-          // If parent has active filter state, synchronize with it
-          if (activeFilterState && activeFilterState !== 'ALL') {
-            setSelectedState(activeFilterState)
-          } else if (json.data.byState.length > 0) {
-            // Default to top state by volume or Uttar Pradesh
+          // If no filter state is set, pick Uttar Pradesh or top state
+          if (!activeFilterState || activeFilterState === 'ALL') {
             const hasUP = json.data.byState.some(
               (s: StateAnalyticsItem) => s.state.toLowerCase() === 'uttar pradesh'
             )
@@ -63,13 +192,15 @@ export function StateProjectsSection({
         console.error('Failed to load state analytics for map:', err)
       })
       .finally(() => {
-        if (isMounted) setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       })
 
     return () => {
       isMounted = false
     }
-  }, [activeFilterState])
+  }, []) // Empty dependency array: fetch once!
 
   // Map state records by name for O(1) lookups
   const stateMap = useMemo(() => {
@@ -193,20 +324,11 @@ export function StateProjectsSection({
               <span>Select State / UT for Detailed Telemetry:</span>
             </div>
 
-            <div className="w-full sm:w-72">
-              <select
-                value={selectedState}
-                onChange={(e) => setSelectedState(e.target.value)}
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                aria-label="Select state for telemetry card"
-              >
-                {stateList.map((s) => (
-                  <option key={s.state} value={s.state}>
-                    {s.state} ({s.totalProjects} {s.totalProjects === 1 ? 'project' : 'projects'})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <StateDropdown
+              states={stateList}
+              selectedState={selectedState}
+              onSelectState={setSelectedState}
+            />
           </div>
 
           {/* Main 2-Column Grid: Left Card (PAIMANA Inspired) & Right India Map */}
