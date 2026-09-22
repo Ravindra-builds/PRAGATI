@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
@@ -28,27 +28,269 @@ import {
   BrainCircuit,
   ShieldAlert,
   Sparkles,
-  FileSpreadsheet,
-  Zap,
-  Sliders,
-  ChevronRight,
-  Activity,
-  ArrowUpRight,
+  Terminal,
+  Send,
+  RotateCcw,
+  Copy,
+  Check,
 } from 'lucide-react'
+
+interface TerminalHistoryItem {
+  command: string
+  output: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  timestamp: string
+}
 
 export default function HomePage() {
   const [showDemoModal, setShowDemoModal] = useState(false)
   const [activeDemoStep, setActiveDemoStep] = useState(0)
   const [selectedWorkflowStep, setSelectedWorkflowStep] = useState(0)
 
+  // Interactive Terminal State
+  const [terminalInput, setTerminalInput] = useState('')
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const [commandHistory, setCommandHistory] = useState<string[]>([])
+  const [terminalLogs, setTerminalLogs] = useState<TerminalHistoryItem[]>([
+    {
+      command: 'pragati --help',
+      output: `PRAGATI CLI — National Infrastructure Predictive Telemetry Engine v1.0.0
+MoSPI PAIMANA & OCMS Standards Alignment • Dual-Target ML Engine
+
+USAGE:
+  pragati <command> [options]
+
+AVAILABLE COMMANDS:
+  pragati --help                Display command manual and available subcommands
+  pragati ingest --sample       Ingest & standardize MoSPI PAIMANA monthly telemetry
+  pragati predict PRJ-0042      Execute dual-target ML inference (Cost & Schedule Delay)
+  pragati explain PRJ-0042      Decompose local SHAP feature attributions & risk drivers
+  pragati alerts                Query active pre-critical early warnings & burn gaps
+  pragati ask "<question>"      Query grounded PRAGATI AI assistant on portfolio data
+  pragati stats                 Display national portfolio outlay & sector breakdown
+  clear                         Clear terminal console screen`,
+      type: 'info',
+      timestamp: '10:00:00',
+    },
+  ])
+  const terminalEndRef = useRef<HTMLDivElement>(null)
+  const terminalInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [terminalLogs])
+
+  const executeCommand = (cmdText: string) => {
+    const raw = cmdText.trim()
+    if (!raw) return
+
+    setCommandHistory((prev) => [...prev, raw])
+    setHistoryIndex(-1)
+    setTerminalInput('')
+
+    const clean = raw.toLowerCase()
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+    if (clean === 'clear' || clean === 'cls') {
+      setTerminalLogs([])
+      return
+    }
+
+    if (clean === 'pragati --help' || clean === '--help' || clean === 'help' || clean === 'pragati') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        {
+          command: raw,
+          output: `PRAGATI CLI — National Infrastructure Predictive Telemetry Engine v1.0.0
+MoSPI PAIMANA & OCMS Standards Alignment • Dual-Target ML Engine
+
+USAGE:
+  pragati <command> [options]
+
+AVAILABLE COMMANDS:
+  pragati --help                Display command manual and available subcommands
+  pragati ingest --sample       Ingest & standardize MoSPI PAIMANA monthly telemetry
+  pragati predict PRJ-0042      Execute dual-target ML inference (Cost & Schedule Delay)
+  pragati explain PRJ-0042      Decompose local SHAP feature attributions & risk drivers
+  pragati alerts                Query active pre-critical early warnings & burn gaps
+  pragati ask "<question>"      Query grounded PRAGATI AI assistant on portfolio data
+  pragati stats                 Display national portfolio outlay & sector breakdown
+  clear                         Clear terminal console screen`,
+          type: 'info',
+          timestamp: now,
+        },
+      ])
+      return
+    }
+
+    if (clean.includes('ingest')) {
+      setTerminalLogs((prev) => [
+        ...prev,
+        {
+          command: raw,
+          output: `[INGEST] Ingesting MoSPI PAIMANA & OCMS Monthly Project Records...
+✓ Parsed 850 central infrastructure assets across 17 central ministries.
+✓ Validated 100% schema constraints. Target outcome quarantine strictly enforced.
+✓ Standardized cumulative expenditure: ₹ 20,36,412.50 Cr against ₹ 37,13,890.00 Cr sanctioned.
+✓ Telemetry snapshot status: SYNCHRONIZED & READY FOR ML INFERENCE.`,
+          type: 'success',
+          timestamp: now,
+        },
+      ])
+      setSelectedWorkflowStep(0)
+      return
+    }
+
+    if (clean.includes('predict')) {
+      const match = raw.match(/PRJ-\d+/i)
+      const projId = match ? match[0].toUpperCase() : 'PRJ-0042'
+      setTerminalLogs((prev) => [
+        ...prev,
+        {
+          command: raw,
+          output: `[PREDICT] Executing Dual-Target ML Inference for ${projId}...
+─────────────────────────────────────────────────────────────────────────────
+• Target 1: Cost Overrun Risk     → 0.74 (HIGH RISK)     [Calibrated Logistic Regression]
+• Target 2: Schedule Delay Risk   → 0.68 (MEDIUM-HIGH)   [Tuned Random Forest]
+• Composite Risk Index            → HIGH (0.71 Overall)
+• Financial-Physical Burn Gap     → 12.3% Divergence (Spend: 75.2% vs Site Progress: 62.9%)
+─────────────────────────────────────────────────────────────────────────────
+✓ Calibration status: Probability boundaries verified in [0.00, 1.00].
+✓ Recommendation: Priority ministerial surveillance required.`,
+          type: 'warning',
+          timestamp: now,
+        },
+      ])
+      setSelectedWorkflowStep(1)
+      return
+    }
+
+    if (clean.includes('explain') || clean.includes('shap')) {
+      const match = raw.match(/PRJ-\d+/i)
+      const projId = match ? match[0].toUpperCase() : 'PRJ-0042'
+      setTerminalLogs((prev) => [
+        ...prev,
+        {
+          command: raw,
+          output: `[SHAP] Local Feature Attribution Decomposition for ${projId}:
+─────────────────────────────────────────────────────────────────────────────
+Rank  Feature Driver                     SHAP Value  Direction Impact
+[01]  Financial Burn Gap (>10%)          +0.312      ↑ Accelerates Overrun Risk
+[02]  Elapsed Duration Ratio (81.0%)      +0.244      ↑ Compounding Schedule Delay
+[03]  Critical Milestone Slippage (38%)  +0.189      ↑ Civil Works Bottleneck
+[04]  Contractor Execution History       -0.125      ↓ Mitigating Factor
+─────────────────────────────────────────────────────────────────────────────
+Base Value E[f(x)] = 0.320 | Model Prediction f(x) = 0.740 (Net Shift: +0.420)`,
+          type: 'info',
+          timestamp: now,
+        },
+      ])
+      setSelectedWorkflowStep(2)
+      return
+    }
+
+    if (clean.includes('alert')) {
+      setTerminalLogs((prev) => [
+        ...prev,
+        {
+          command: raw,
+          output: `[ALERTS] Active Portfolio Early Warning Triggers (Total: 28 Active Alerts):
+─────────────────────────────────────────────────────────────────────────────
+• [CRITICAL] PRJ-0042 (Western DFC)       : Financial burn gap (12.3%) outpaces site progress
+• [HIGH]     PRJ-0118 (NH-44 Expressway)  : 38% critical path milestones delayed > 90 days
+• [HIGH]     PRJ-0205 (Kudankulam Unit 3) : Milestone slippage ratio = 0.42
+• [MEDIUM]   PRJ-0341 (Mumbai Metro L4)   : Elapsed duration (78%) outpaces civil completion (61%)
+─────────────────────────────────────────────────────────────────────────────
+✓ Full early warning logs and resolution workflows available at /dashboard/alerts`,
+          type: 'warning',
+          timestamp: now,
+        },
+      ])
+      setSelectedWorkflowStep(2)
+      return
+    }
+
+    if (clean.includes('ask') || clean.includes('ai') || clean.includes('chat')) {
+      const question = raw.replace(/^pragati\s+ask\s+/i, '').replace(/["']/g, '').trim()
+      setTerminalLogs((prev) => [
+        ...prev,
+        {
+          command: raw,
+          output: `[PRAGATI AI] Query: "${question || 'Why is PRJ-0042 flagged with High Cost Risk?'}"
+─────────────────────────────────────────────────────────────────────────────
+"PRJ-0042 (Western Dedicated Freight Corridor) has incurred ₹38,650.00 Cr (75.2% of sanctioned budget) against physical completion of 62.9%, creating an anomalous 12.3% burn gap. Local SHAP attribution confirms this financial-physical divergence (+0.31) and remaining critical civil milestones (+0.24) are the primary drivers for the 0.74 Cost Overrun probability."`,
+          type: 'info',
+          timestamp: now,
+        },
+      ])
+      setSelectedWorkflowStep(3)
+      return
+    }
+
+    if (clean.includes('stat')) {
+      setTerminalLogs((prev) => [
+        ...prev,
+        {
+          command: raw,
+          output: `[PORTFOLIO STATS] National Infrastructure Portfolio Summary:
+─────────────────────────────────────────────────────────────────────────────
+• Total Monitored Projects : 850 Assets (₹150 Cr & Above)
+• Central Ministries       : 17 Ministries (Railways, MoRTH, Power, Shipping, etc.)
+• Key Sectors              : 6 Sectors
+• Original Sanctioned Cost : ₹ 37,13,890.00 Cr
+• Revised Sanctioned Cost  : ₹ 42,78,120.00 Cr (+15.2% Cost Escalation)
+• Cumulative Expenditure   : ₹ 20,36,412.50 Cr (54.8% Outlay Realized)
+• Portfolio Risk Breakdown : 142 High Risk | 318 Medium Risk | 390 Low Risk`,
+          type: 'success',
+          timestamp: now,
+        },
+      ])
+      return
+    }
+
+    // Default unrecognized
+    setTerminalLogs((prev) => [
+      ...prev,
+      {
+        command: raw,
+        output: `Command not recognized: '${raw}'
+Type 'pragati --help' to view available commands.`,
+        type: 'error',
+        timestamp: now,
+      },
+    ])
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      executeCommand(terminalInput)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (commandHistory.length > 0) {
+        const nextIdx = historyIndex + 1 < commandHistory.length ? historyIndex + 1 : historyIndex
+        setHistoryIndex(nextIdx)
+        setTerminalInput(commandHistory[commandHistory.length - 1 - nextIdx] || '')
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (historyIndex > 0) {
+        const nextIdx = historyIndex - 1
+        setHistoryIndex(nextIdx)
+        setTerminalInput(commandHistory[commandHistory.length - 1 - nextIdx] || '')
+      } else if (historyIndex === 0) {
+        setHistoryIndex(-1)
+        setTerminalInput('')
+      }
+    }
+  }
+
   const workflowSteps = [
     {
       stepNumber: '1',
       badge: 'Step 01 • Data Layer',
       icon: Database,
-      accentColor: 'from-cyan-500 to-blue-600',
-      badgeColor: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400',
-      glowColor: 'shadow-cyan-500/20 border-cyan-400/80',
+      accentColor: 'from-cyan-600 to-blue-600',
+      badgeColor: 'border-cyan-200 bg-cyan-50 text-cyan-800',
       headline: 'Ingest & Standardize. Real-Time Telemetry Pipeline.',
       description:
         'Continuous ingestion of monthly project snapshots across 850 infrastructure assets, standardizing expenditure, physical progress, and milestone schedules across formats.',
@@ -60,30 +302,14 @@ export default function HomePage() {
       ],
       ctaText: 'Explore Data Lab & Projects',
       ctaHref: '/dashboard/data-lab',
-      preview: {
-        title: 'Data Ingestion Telemetry Preview',
-        tag: 'MoSPI Telemetry Ingested',
-        code: `// Sample Standardized Ingestion Record
-{
-  "projectId": "PRJ-0042",
-  "name": "Western Dedicated Freight Corridor",
-  "ministry": "Ministry of Railways",
-  "sanctionedCostCr": 51420.00,
-  "cumulativeExpenditureCr": 38650.00,
-  "physicalProgressPct": 76.5,
-  "financialBurnGapPct": 12.3,
-  "sanctionedMonths": 84,
-  "elapsedMonths": 68
-}`,
-      },
+      terminalCmd: 'pragati ingest --sample',
     },
     {
       stepNumber: '2',
       badge: 'Step 02 • ML Intelligence',
       icon: Cpu,
-      accentColor: 'from-blue-500 to-indigo-600',
-      badgeColor: 'border-blue-500/30 bg-blue-500/10 text-blue-400',
-      glowColor: 'shadow-blue-500/20 border-blue-400/80',
+      accentColor: 'from-blue-600 to-indigo-600',
+      badgeColor: 'border-blue-200 bg-blue-50 text-blue-800',
       headline: 'Forecast Risk. Dual-Target ML Classification.',
       description:
         'Independent binary classification models compute calibrated probability scores for Cost Overrun (Logistic Regression) and Schedule Delay (Random Forest) months before escalation.',
@@ -95,32 +321,14 @@ export default function HomePage() {
       ],
       ctaText: 'View Predictive Analytics',
       ctaHref: '/dashboard/analytics',
-      preview: {
-        title: 'Dual-Target ML Output Matrix',
-        tag: 'Calibrated Inference',
-        code: `// ML Inference Risk Classification
-{
-  "costOverrunRisk": {
-    "probability": 0.74,
-    "classification": "HIGH_RISK",
-    "model": "Calibrated Logistic Regression"
-  },
-  "scheduleDelayRisk": {
-    "probability": 0.68,
-    "classification": "MEDIUM_HIGH",
-    "model": "Tuned Random Forest"
-  },
-  "compositeRiskIndex": "HIGH (0.71)"
-}`,
-      },
+      terminalCmd: 'pragati predict PRJ-0042',
     },
     {
       stepNumber: '3',
       badge: 'Step 03 • Explainability & Alerts',
       icon: ShieldAlert,
-      accentColor: 'from-indigo-500 to-violet-600',
-      badgeColor: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400',
-      glowColor: 'shadow-indigo-500/20 border-indigo-400/80',
+      accentColor: 'from-indigo-600 to-violet-600',
+      badgeColor: 'border-indigo-200 bg-indigo-50 text-indigo-800',
       headline: 'Explain & Alert. SHAP Drivers & Rule Triggers.',
       description:
         'Decomposes predictive scores into clear mathematical factor attributions with Shapley values, while deterministic rules surface immediate early warning flags on abnormal burn gaps.',
@@ -132,25 +340,14 @@ export default function HomePage() {
       ],
       ctaText: 'Review Early Warning Alerts',
       ctaHref: '/dashboard/alerts',
-      preview: {
-        title: 'Local SHAP Drivers & Warnings',
-        tag: 'Factor Attribution',
-        code: `// Local SHAP Factor Attribution
-[
-  { "feature": "Financial Burn Gap (>10%)", "shapValue": +0.31, "direction": "Escalation" },
-  { "feature": "Elapsed Timeline Ratio (81%)", "shapValue": +0.24, "direction": "Delay" },
-  { "feature": "Contractor Prior Track Record", "shapValue": -0.12, "direction": "Mitigating" }
-]
-// Active Early Warning: "Burn Gap Critical (12.3% ahead of site progress)"`,
-      },
+      terminalCmd: 'pragati explain PRJ-0042',
     },
     {
       stepNumber: '4',
       badge: 'Step 04 • Decision Support',
       icon: Bot,
-      accentColor: 'from-violet-500 to-fuchsia-600',
-      badgeColor: 'border-violet-500/30 bg-violet-500/10 text-violet-400',
-      glowColor: 'shadow-violet-500/20 border-violet-400/80',
+      accentColor: 'from-violet-600 to-fuchsia-600',
+      badgeColor: 'border-violet-200 bg-violet-50 text-violet-800',
       headline: 'Decide & Act. Grounded AI & Executive Insights.',
       description:
         'Interactive AI assistant grounded directly in live portfolio telemetry, accompanied by state-wise vector map dossiers, multi-project comparisons, and automated interventions.',
@@ -162,13 +359,7 @@ export default function HomePage() {
       ],
       ctaText: 'Launch PRAGATI AI Assistant',
       ctaHref: '/dashboard/assistant',
-      preview: {
-        title: 'Grounded AI Executive Query',
-        tag: 'Grounded LLM Response',
-        code: `// PRAGATI Intelligence Assistant Query:
-User: "Why is PRJ-0042 flagged with High Cost Risk?"
-Assistant: "PRJ-0042 (Western DFC) exhibits an expenditure burn rate of 75.2% against physical completion of 62.9%, creating a 12.3% burn gap. SHAP attribution identifies this financial-physical divergence (+0.31) and remaining critical path milestones (+0.24) as primary risk drivers."`,
-      },
+      terminalCmd: 'pragati ask "Why is PRJ-0042 at risk?"',
     },
   ]
 
@@ -433,38 +624,38 @@ Assistant: "PRJ-0042 (Western DFC) exhibits an expenditure burn rate of 75.2% ag
         </div>
       </section>
 
-      {/* 2. HOW IT WORKS SECTION — HORIZONTAL PIPELINE INSPIRED BY REFERENCE DESIGN */}
-      <section className="py-12 sm:py-16 bg-slate-950 text-white relative overflow-hidden border-b border-slate-800">
-        {/* Subtle background glow effect */}
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-blue-600/15 via-indigo-600/10 to-transparent blur-3xl pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
+      {/* 2. HOW IT WORKS SECTION — LIGHT THEME & HORIZONTAL WORKFLOW */}
+      <section className="py-12 sm:py-16 bg-slate-50/80 border-b border-slate-200/80 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           {/* Section Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10 pb-4 border-b border-slate-800/80">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 pb-4 border-b border-slate-200">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-mono mb-2.5">
-                <Sparkles className="w-3.5 h-3.5" />
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-800 text-xs font-mono font-semibold mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                 <span>HOW IT WORKS &bull; END-TO-END PIPELINE</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
                 From Raw Telemetry to Executive Action
               </h2>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mt-1 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mt-1 leading-relaxed">
                 A horizontal 4-stage pipeline combining automated ingestion, calibrated ML inference, local SHAP attribution, and grounded decision support.
               </p>
             </div>
 
-            {/* Quick interactive tab switcher for detailed preview */}
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+            {/* Step Selection Tabs */}
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white border border-slate-200 shadow-2xs shrink-0">
               {workflowSteps.map((step, idx) => (
                 <button
                   key={step.stepNumber}
                   type="button"
-                  onClick={() => setSelectedWorkflowStep(idx)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  onClick={() => {
+                    setSelectedWorkflowStep(idx)
+                    executeCommand(step.terminalCmd)
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                     selectedWorkflowStep === idx
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      ? 'bg-blue-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
                   <span className="font-mono text-[11px]">0{step.stepNumber}</span>
@@ -474,127 +665,213 @@ Assistant: "PRJ-0042 (Western DFC) exhibits an expenditure burn rate of 75.2% ag
             </div>
           </div>
 
-          {/* HORIZONTAL WORKFLOW CARDS GRID WITH CONNECTED GRADIENT RAIL */}
-          <div className="relative">
-            {/* Horizontal Glowing Connection Line (Desktop) */}
-            <div className="hidden lg:block absolute top-[28px] left-[6%] right-[6%] h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 via-indigo-500 to-violet-500 shadow-[0_0_12px_rgba(59,130,246,0.5)] z-0 rounded-full" />
+          {/* HORIZONTAL WORKFLOW CARDS GRID (CLEAN LIGHT THEME, NO OVERLAY BG LINE) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {workflowSteps.map((step, idx) => {
+              const IconComponent = step.icon
+              const isSelected = selectedWorkflowStep === idx
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-              {workflowSteps.map((step, idx) => {
-                const IconComponent = step.icon
-                const isSelected = selectedWorkflowStep === idx
-
-                return (
-                  <div
-                    key={step.stepNumber}
-                    onClick={() => setSelectedWorkflowStep(idx)}
-                    className={`flex flex-col justify-between rounded-2xl p-5 sm:p-6 transition-all duration-300 border cursor-pointer group ${
-                      isSelected
-                        ? 'bg-slate-900/95 border-blue-500/80 shadow-[0_0_24px_rgba(59,130,246,0.25)] ring-1 ring-blue-400/30 -translate-y-1'
-                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80'
-                    }`}
-                  >
-                    <div>
-                      {/* Step Ring Node & Icon Indicator */}
-                      <div className="flex items-center justify-between mb-5">
-                        {/* Glowing Ring Number Node (Inspired by User Design) */}
-                        <div className="relative flex items-center justify-center">
-                          <div
-                            className={`w-14 h-14 rounded-full bg-slate-950 border-2 flex items-center justify-center transition-all ${
-                              isSelected
-                                ? step.glowColor + ' shadow-[0_0_16px_rgba(59,130,246,0.6)]'
-                                : 'border-slate-700 group-hover:border-slate-500'
-                            }`}
-                          >
-                            <span className="text-lg font-extrabold font-mono text-white">
-                              {step.stepNumber}
-                            </span>
-                          </div>
-                          {/* Inner pulse dot when selected */}
-                          {isSelected && (
-                            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
-                          )}
-                        </div>
-
-                        {/* Step Icon Badge */}
+              return (
+                <div
+                  key={step.stepNumber}
+                  onClick={() => {
+                    setSelectedWorkflowStep(idx)
+                    executeCommand(step.terminalCmd)
+                  }}
+                  className={`flex flex-col justify-between rounded-2xl p-5 sm:p-6 transition-all duration-300 border cursor-pointer group ${
+                    isSelected
+                      ? 'bg-white border-blue-500 shadow-md ring-2 ring-blue-500/20 -translate-y-1'
+                      : 'bg-white border-slate-200/90 shadow-2xs hover:shadow-sm hover:border-slate-300'
+                  }`}
+                >
+                  <div>
+                    {/* Step Ring Node & Icon Indicator */}
+                    <div className="flex items-center justify-between mb-4">
+                      {/* Step Number Badge */}
+                      <div className="relative flex items-center justify-center">
                         <div
-                          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${step.accentColor} text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform`}
+                          className={`w-12 h-12 rounded-full flex items-center justify-center font-mono font-extrabold text-base transition-all ${
+                            isSelected
+                              ? 'bg-blue-700 text-white shadow-md ring-4 ring-blue-100'
+                              : 'bg-slate-900 text-white ring-4 ring-slate-100 group-hover:bg-slate-800'
+                          }`}
                         >
-                          <IconComponent className="w-5 h-5" />
+                          {step.stepNumber}
                         </div>
+                        {isSelected && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+                        )}
                       </div>
 
-                      {/* Pill Badge */}
-                      <div className="mb-3">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-md border text-[11px] font-mono uppercase tracking-wider font-semibold ${step.badgeColor}`}
-                        >
-                          {step.badge}
-                        </span>
-                      </div>
-
-                      {/* Headline */}
-                      <h3 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug mb-2 group-hover:text-blue-300 transition-colors">
-                        {step.headline}
-                      </h3>
-
-                      {/* Narrative Description */}
-                      <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                        {step.description}
-                      </p>
-
-                      {/* Key Feature Checkmarks (Bullet List Inspired by Screenshot) */}
-                      <ul className="space-y-2 mb-6 border-t border-slate-800/80 pt-3">
-                        {step.bullets.map((bullet, bIdx) => (
-                          <li
-                            key={bIdx}
-                            className="flex items-start gap-2 text-[11.5px] text-slate-300 leading-tight"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                            <span>{bullet}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Dark CTA Action Button */}
-                    <div className="pt-2 border-t border-slate-800/80">
-                      <Link
-                        href={step.ctaHref}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full inline-flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-800 hover:border-blue-500 text-xs font-semibold shadow-xs transition-all group/btn"
+                      {/* Icon Container */}
+                      <div
+                        className={`w-9 h-9 rounded-xl bg-gradient-to-br ${step.accentColor} text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform`}
                       >
-                        <span>{step.ctaText}</span>
-                        <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
-                      </Link>
+                        <IconComponent className="w-4 h-4" />
+                      </div>
                     </div>
+
+                    {/* Pill Category Badge */}
+                    <div className="mb-2.5">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-md border text-[10.5px] font-mono uppercase tracking-wider font-semibold ${step.badgeColor}`}
+                      >
+                        {step.badge}
+                      </span>
+                    </div>
+
+                    {/* Headline */}
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug mb-2 group-hover:text-blue-700 transition-colors">
+                      {step.headline}
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                      {step.description}
+                    </p>
+
+                    {/* Bullet List with Green Checkmarks */}
+                    <ul className="space-y-2 mb-5 border-t border-slate-100 pt-3">
+                      {step.bullets.map((bullet, bIdx) => (
+                        <li
+                          key={bIdx}
+                          className="flex items-start gap-2 text-[11.5px] text-slate-700 leading-snug"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                )
-              })}
-            </div>
+
+                  {/* Card Bottom CTA */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <Link
+                      href={step.ctaHref}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full inline-flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition-colors group/btn cursor-pointer"
+                    >
+                      <span>{step.ctaText}</span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
-          {/* LIVE STAGE CODE & TELEMETRY INSPECTOR PREVIEW */}
-          <div className="mt-8 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-2xl">
-            <div className="px-5 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+          {/* INTERACTIVE PRAGATI CLI TERMINAL (WITH --help COMMANDS & EXECUTOR) */}
+          <div className="mt-8 rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden flex flex-col">
+            {/* Terminal Window Header */}
+            <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-rose-500/80" />
-                  <span className="w-3 h-3 rounded-full bg-amber-500/80" />
-                  <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
+                  <span className="w-3 h-3 rounded-full bg-rose-500/90 inline-block shadow-2xs" />
+                  <span className="w-3 h-3 rounded-full bg-amber-500/90 inline-block shadow-2xs" />
+                  <span className="w-3 h-3 rounded-full bg-emerald-500/90 inline-block shadow-2xs" />
                 </div>
-                <span className="text-xs font-mono text-slate-400 border-l border-slate-800 pl-3">
-                  {workflowSteps[selectedWorkflowStep].preview.title}
-                </span>
+                <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+                  <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-xs font-mono text-slate-300 font-semibold">
+                    pragati-cli v1.0.0 &bull; Interactive Telemetry Console
+                  </span>
+                </div>
               </div>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-900/60 border border-blue-700/60 text-blue-300">
-                {workflowSteps[selectedWorkflowStep].preview.tag}
-              </span>
+
+              {/* Quick Action Suggestion Chips */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10.5px] font-mono text-slate-500 hidden sm:inline">Try:</span>
+                {[
+                  { label: '--help', cmd: 'pragati --help' },
+                  { label: 'ingest', cmd: 'pragati ingest --sample' },
+                  { label: 'predict', cmd: 'pragati predict PRJ-0042' },
+                  { label: 'explain', cmd: 'pragati explain PRJ-0042' },
+                  { label: 'alerts', cmd: 'pragati alerts' },
+                  { label: 'ask AI', cmd: 'pragati ask "Why is PRJ-0042 at risk?"' },
+                  { label: 'stats', cmd: 'pragati stats' },
+                ].map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => executeCommand(chip.cmd)}
+                    className="px-2 py-0.5 rounded-md bg-slate-800/90 hover:bg-blue-600 text-slate-300 hover:text-white border border-slate-700/80 font-mono text-[10.5px] transition-colors cursor-pointer"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => executeCommand('clear')}
+                  title="Clear Console"
+                  className="p-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer ml-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-            <div className="p-4 sm:p-5 bg-slate-950/80 font-mono text-xs text-emerald-300 overflow-x-auto">
-              <pre className="leading-relaxed">
-                <code>{workflowSteps[selectedWorkflowStep].preview.code}</code>
-              </pre>
+
+            {/* Terminal Output Stream */}
+            <div className="p-4 sm:p-5 font-mono text-xs max-h-[320px] overflow-y-auto space-y-3 bg-slate-950/95 scrollbar-thin scrollbar-thumb-slate-800">
+              {terminalLogs.length === 0 ? (
+                <div className="text-slate-500 italic">
+                  Terminal screen cleared. Type <span className="text-cyan-400 font-semibold">pragati --help</span> or select a command above to execute.
+                </div>
+              ) : (
+                terminalLogs.map((log, idx) => (
+                  <div key={idx} className="space-y-1">
+                    {/* Prompt Line */}
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <span className="text-emerald-400 font-bold">admin@pragati</span>
+                      <span className="text-slate-600">:</span>
+                      <span className="text-blue-400">~</span>
+                      <span className="text-slate-500">$</span>
+                      <span className="text-slate-100 font-semibold">{log.command}</span>
+                      <span className="text-[10px] text-slate-600 ml-auto">{log.timestamp}</span>
+                    </div>
+
+                    {/* Output Block */}
+                    <div
+                      className={`pl-4 border-l-2 py-0.5 whitespace-pre-wrap ${
+                        log.type === 'error'
+                          ? 'border-rose-500/80 text-rose-300'
+                          : log.type === 'warning'
+                          ? 'border-amber-500/80 text-amber-200'
+                          : log.type === 'success'
+                          ? 'border-emerald-500/80 text-emerald-300'
+                          : 'border-cyan-500/80 text-slate-200'
+                      }`}
+                    >
+                      {log.output}
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={terminalEndRef} />
+            </div>
+
+            {/* Interactive Command Input Box */}
+            <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
+              <span className="text-emerald-400 font-mono text-xs font-bold shrink-0">
+                pragati &gt;
+              </span>
+              <input
+                ref={terminalInputRef}
+                type="text"
+                value={terminalInput}
+                onChange={(e) => setTerminalInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type command (e.g. pragati --help, pragati predict PRJ-0042, clear)..."
+                className="flex-1 bg-transparent text-white placeholder-slate-500 font-mono text-xs focus:outline-none border-none"
+              />
+              <button
+                type="button"
+                onClick={() => executeCommand(terminalInput)}
+                disabled={!terminalInput.trim()}
+                className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Run</span>
+                <Send className="w-3 h-3" />
+              </button>
             </div>
           </div>
         </div>
