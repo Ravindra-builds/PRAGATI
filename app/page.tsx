@@ -53,31 +53,20 @@ export default function HomePage() {
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [terminalLogs, setTerminalLogs] = useState<TerminalHistoryItem[]>([
     {
-      command: 'pragati --help',
-      output: `PRAGATI CLI — National Infrastructure Predictive Telemetry Engine v1.0.0
-MoSPI PAIMANA & OCMS Standards Alignment • Dual-Target ML Engine
-
-USAGE:
-  pragati <command> [options]
-
-AVAILABLE COMMANDS:
-  pragati --help                Display command manual and available subcommands
-  pragati ingest --sample       Ingest & standardize MoSPI PAIMANA monthly telemetry
-  pragati predict PRJ-0042      Execute dual-target ML inference (Cost & Schedule Delay)
-  pragati explain PRJ-0042      Decompose local SHAP feature attributions & risk drivers
-  pragati alerts                Query active pre-critical early warnings & burn gaps
-  pragati ask "<question>"      Query grounded PRAGATI AI assistant on portfolio data
-  pragati stats                 Display national portfolio outlay & sector breakdown
-  clear                         Clear terminal console screen`,
+      command: 'pragati --version',
+      output: `PRAGATI Telemetry Engine v1.0.0 (MoSPI PAIMANA / OCMS Standards Alignment)
+Type 'pragati --help' or click [--help] to list available commands.`,
       type: 'info',
-      timestamp: '10:00:00',
+      timestamp: 'READY',
     },
   ])
-  const terminalEndRef = useRef<HTMLDivElement>(null)
+  const terminalContainerRef = useRef<HTMLDivElement>(null)
   const terminalInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (terminalContainerRef.current) {
+      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight
+    }
   }, [terminalLogs])
 
   const executeCommand = (cmdText: string) => {
@@ -760,61 +749,53 @@ Type 'pragati --help' to view available commands.`,
             })}
           </div>
 
-          {/* INTERACTIVE PRAGATI CLI TERMINAL (WITH --help COMMANDS & EXECUTOR) */}
-          <div className="mt-8 rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden flex flex-col">
+          {/* INTERACTIVE PRAGATI CLI TERMINAL */}
+          <div className="mt-8 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-lg overflow-hidden flex flex-col backdrop-blur-xs">
             {/* Terminal Window Header */}
-            <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div className="px-4 py-2.5 bg-slate-800/85 border-b border-slate-700/70 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-rose-500/90 inline-block shadow-2xs" />
-                  <span className="w-3 h-3 rounded-full bg-amber-500/90 inline-block shadow-2xs" />
-                  <span className="w-3 h-3 rounded-full bg-emerald-500/90 inline-block shadow-2xs" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/90 inline-block shadow-2xs" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/90 inline-block shadow-2xs" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/90 inline-block shadow-2xs" />
                 </div>
-                <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+                <div className="flex items-center gap-2 pl-2 border-l border-slate-700/60">
                   <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-xs font-mono text-slate-300 font-semibold">
-                    pragati-cli v1.0.0 &bull; Interactive Telemetry Console
+                  <span className="text-xs font-mono text-slate-300 font-semibold tracking-wide">
+                    pragati-cli &bull; Infrastructure Telemetry Console
                   </span>
                 </div>
               </div>
 
-              {/* Quick Action Suggestion Chips */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10.5px] font-mono text-slate-500 hidden sm:inline">Try:</span>
-                {[
-                  { label: '--help', cmd: 'pragati --help' },
-                  { label: 'ingest', cmd: 'pragati ingest --sample' },
-                  { label: 'predict', cmd: 'pragati predict PRJ-0042' },
-                  { label: 'explain', cmd: 'pragati explain PRJ-0042' },
-                  { label: 'alerts', cmd: 'pragati alerts' },
-                  { label: 'ask AI', cmd: 'pragati ask "Why is PRJ-0042 at risk?"' },
-                  { label: 'stats', cmd: 'pragati stats' },
-                ].map((chip) => (
-                  <button
-                    key={chip.label}
-                    type="button"
-                    onClick={() => executeCommand(chip.cmd)}
-                    className="px-2 py-0.5 rounded-md bg-slate-800/90 hover:bg-blue-600 text-slate-300 hover:text-white border border-slate-700/80 font-mono text-[10.5px] transition-colors cursor-pointer"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+              {/* Minimalist Essential Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => executeCommand('pragati --help')}
+                  className="px-2.5 py-1 rounded-md bg-slate-700/70 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-600/70 font-mono text-xs transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>--help</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => executeCommand('clear')}
                   title="Clear Console"
-                  className="p-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer ml-1"
+                  className="px-2 py-1 rounded-md bg-slate-700/60 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-600/60 font-mono text-xs transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden sm:inline">clear</span>
                 </button>
               </div>
             </div>
 
-            {/* Terminal Output Stream */}
-            <div className="p-4 sm:p-5 font-mono text-xs max-h-[320px] overflow-y-auto space-y-3 bg-slate-950/95 scrollbar-thin scrollbar-thumb-slate-800">
+            {/* Terminal Output Stream with Internal Scrolling */}
+            <div
+              ref={terminalContainerRef}
+              className="p-4 font-mono text-xs max-h-[260px] overflow-y-auto space-y-2.5 bg-slate-950/70 text-slate-200 scrollbar-thin scrollbar-thumb-slate-700"
+            >
               {terminalLogs.length === 0 ? (
-                <div className="text-slate-500 italic">
-                  Terminal screen cleared. Type <span className="text-cyan-400 font-semibold">pragati --help</span> or select a command above to execute.
+                <div className="text-slate-500 italic py-2">
+                  Console cleared. Type <span className="text-cyan-400 font-semibold">pragati --help</span> or click <span className="text-slate-300 font-semibold">[--help]</span> to display commands.
                 </div>
               ) : (
                 terminalLogs.map((log, idx) => (
@@ -826,19 +807,19 @@ Type 'pragati --help' to view available commands.`,
                       <span className="text-blue-400">~</span>
                       <span className="text-slate-500">$</span>
                       <span className="text-slate-100 font-semibold">{log.command}</span>
-                      <span className="text-[10px] text-slate-600 ml-auto">{log.timestamp}</span>
+                      <span className="text-[10px] text-slate-500 ml-auto font-mono">{log.timestamp}</span>
                     </div>
 
                     {/* Output Block */}
                     <div
-                      className={`pl-4 border-l-2 py-0.5 whitespace-pre-wrap ${
+                      className={`pl-3 border-l-2 py-0.5 whitespace-pre-wrap leading-relaxed ${
                         log.type === 'error'
                           ? 'border-rose-500/80 text-rose-300'
                           : log.type === 'warning'
                           ? 'border-amber-500/80 text-amber-200'
                           : log.type === 'success'
                           ? 'border-emerald-500/80 text-emerald-300'
-                          : 'border-cyan-500/80 text-slate-200'
+                          : 'border-cyan-500/80 text-slate-300'
                       }`}
                     >
                       {log.output}
@@ -846,12 +827,11 @@ Type 'pragati --help' to view available commands.`,
                   </div>
                 ))
               )}
-              <div ref={terminalEndRef} />
             </div>
 
             {/* Interactive Command Input Box */}
-            <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
-              <span className="text-emerald-400 font-mono text-xs font-bold shrink-0">
+            <div className="p-2.5 bg-slate-900/95 border-t border-slate-800 flex items-center gap-2">
+              <span className="text-emerald-400 font-mono text-xs font-bold shrink-0 pl-1">
                 pragati &gt;
               </span>
               <input
@@ -867,7 +847,7 @@ Type 'pragati --help' to view available commands.`,
                 type="button"
                 onClick={() => executeCommand(terminalInput)}
                 disabled={!terminalInput.trim()}
-                className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:hover:bg-blue-600 text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <span>Run</span>
                 <Send className="w-3 h-3" />
