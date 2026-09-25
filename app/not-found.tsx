@@ -14,18 +14,18 @@ export default function NotFound() {
   return (
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-sky-50/40 via-slate-50/30 to-white">
       <div className="max-w-xl w-full text-center space-y-6 bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-10 shadow-lg ring-1 ring-slate-900/5">
-        {/* Emblem & Institutional Eyebrow */}
-        <div className="flex items-center justify-center gap-3">
-          <div className="relative w-7 h-9 shrink-0 flex items-center justify-center">
+        {/* Logo & Institutional Eyebrow */}
+        <div className="flex items-center justify-center gap-2.5">
+          <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
             <Image
-              src="/images/emblem.png"
-              alt="State Emblem of India"
-              width={28}
-              height={36}
+              src="/logo.png"
+              alt="PRAGATI Logo"
+              width={32}
+              height={32}
               className="object-contain"
             />
           </div>
-          <div className="text-left border-l border-slate-200 pl-2.5">
+          <div className="text-left">
             <div className="text-xs font-bold text-slate-900 leading-tight">PRAGATI PLATFORM</div>
             <div className="text-[10px] text-slate-500 leading-tight">Infrastructure Monitoring System</div>
           </div>

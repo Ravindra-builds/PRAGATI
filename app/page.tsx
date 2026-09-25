@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
@@ -28,250 +28,12 @@ import {
   BrainCircuit,
   ShieldAlert,
   Sparkles,
-  Terminal,
-  Send,
-  RotateCcw,
-  Copy,
-  Check,
 } from 'lucide-react'
-
-interface TerminalHistoryItem {
-  command: string
-  output: string
-  type: 'info' | 'success' | 'warning' | 'error'
-  timestamp: string
-}
 
 export default function HomePage() {
   const [showDemoModal, setShowDemoModal] = useState(false)
   const [activeDemoStep, setActiveDemoStep] = useState(0)
   const [selectedWorkflowStep, setSelectedWorkflowStep] = useState(0)
-
-  // Interactive Terminal State
-  const [terminalInput, setTerminalInput] = useState('')
-  const [historyIndex, setHistoryIndex] = useState(-1)
-  const [commandHistory, setCommandHistory] = useState<string[]>([])
-  const [terminalLogs, setTerminalLogs] = useState<TerminalHistoryItem[]>([
-    {
-      command: 'pragati --version',
-      output: `PRAGATI Telemetry Engine v1.0.0 (MoSPI PAIMANA / OCMS Standards Alignment)
-Type 'pragati --help' or click [--help] to list available commands.`,
-      type: 'info',
-      timestamp: 'READY',
-    },
-  ])
-  const terminalContainerRef = useRef<HTMLDivElement>(null)
-  const terminalInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (terminalContainerRef.current) {
-      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight
-    }
-  }, [terminalLogs])
-
-  const executeCommand = (cmdText: string) => {
-    const raw = cmdText.trim()
-    if (!raw) return
-
-    setCommandHistory((prev) => [...prev, raw])
-    setHistoryIndex(-1)
-    setTerminalInput('')
-
-    const clean = raw.toLowerCase()
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-
-    if (clean === 'clear' || clean === 'cls') {
-      setTerminalLogs([])
-      return
-    }
-
-    if (clean === 'pragati --help' || clean === '--help' || clean === 'help' || clean === 'pragati') {
-      setTerminalLogs((prev) => [
-        ...prev,
-        {
-          command: raw,
-          output: `PRAGATI CLI — National Infrastructure Predictive Telemetry Engine v1.0.0
-MoSPI PAIMANA & OCMS Standards Alignment • Dual-Target ML Engine
-
-USAGE:
-  pragati <command> [options]
-
-AVAILABLE COMMANDS:
-  pragati --help                Display command manual and available subcommands
-  pragati ingest --sample       Ingest & standardize MoSPI PAIMANA monthly telemetry
-  pragati predict PRJ-0042      Execute dual-target ML inference (Cost & Schedule Delay)
-  pragati explain PRJ-0042      Decompose local SHAP feature attributions & risk drivers
-  pragati alerts                Query active pre-critical early warnings & burn gaps
-  pragati ask "<question>"      Query grounded PRAGATI AI assistant on portfolio data
-  pragati stats                 Display national portfolio outlay & sector breakdown
-  clear                         Clear terminal console screen`,
-          type: 'info',
-          timestamp: now,
-        },
-      ])
-      return
-    }
-
-    if (clean.includes('ingest')) {
-      setTerminalLogs((prev) => [
-        ...prev,
-        {
-          command: raw,
-          output: `[INGEST] Ingesting MoSPI PAIMANA & OCMS Monthly Project Records...
-✓ Parsed 850 central infrastructure assets across 17 central ministries.
-✓ Validated 100% schema constraints. Target outcome quarantine strictly enforced.
-✓ Standardized cumulative expenditure: ₹ 20,36,412.50 Cr against ₹ 37,13,890.00 Cr sanctioned.
-✓ Telemetry snapshot status: SYNCHRONIZED & READY FOR ML INFERENCE.`,
-          type: 'success',
-          timestamp: now,
-        },
-      ])
-      setSelectedWorkflowStep(0)
-      return
-    }
-
-    if (clean.includes('predict')) {
-      const match = raw.match(/PRJ-\d+/i)
-      const projId = match ? match[0].toUpperCase() : 'PRJ-0042'
-      setTerminalLogs((prev) => [
-        ...prev,
-        {
-          command: raw,
-          output: `[PREDICT] Executing Dual-Target ML Inference for ${projId}...
-─────────────────────────────────────────────────────────────────────────────
-• Target 1: Cost Overrun Risk     → 0.74 (HIGH RISK)     [Calibrated Logistic Regression]
-• Target 2: Schedule Delay Risk   → 0.68 (MEDIUM-HIGH)   [Tuned Random Forest]
-• Composite Risk Index            → HIGH (0.71 Overall)
-• Financial-Physical Burn Gap     → 12.3% Divergence (Spend: 75.2% vs Site Progress: 62.9%)
-─────────────────────────────────────────────────────────────────────────────
-✓ Calibration status: Probability boundaries verified in [0.00, 1.00].
-✓ Recommendation: Priority ministerial surveillance required.`,
-          type: 'warning',
-          timestamp: now,
-        },
-      ])
-      setSelectedWorkflowStep(1)
-      return
-    }
-
-    if (clean.includes('explain') || clean.includes('shap')) {
-      const match = raw.match(/PRJ-\d+/i)
-      const projId = match ? match[0].toUpperCase() : 'PRJ-0042'
-      setTerminalLogs((prev) => [
-        ...prev,
-        {
-          command: raw,
-          output: `[SHAP] Local Feature Attribution Decomposition for ${projId}:
-─────────────────────────────────────────────────────────────────────────────
-Rank  Feature Driver                     SHAP Value  Direction Impact
-[01]  Financial Burn Gap (>10%)          +0.312      ↑ Accelerates Overrun Risk
-[02]  Elapsed Duration Ratio (81.0%)      +0.244      ↑ Compounding Schedule Delay
-[03]  Critical Milestone Slippage (38%)  +0.189      ↑ Civil Works Bottleneck
-[04]  Contractor Execution History       -0.125      ↓ Mitigating Factor
-─────────────────────────────────────────────────────────────────────────────
-Base Value E[f(x)] = 0.320 | Model Prediction f(x) = 0.740 (Net Shift: +0.420)`,
-          type: 'info',
-          timestamp: now,
-        },
-      ])
-      setSelectedWorkflowStep(2)
-      return
-    }
-
-    if (clean.includes('alert')) {
-      setTerminalLogs((prev) => [
-        ...prev,
-        {
-          command: raw,
-          output: `[ALERTS] Active Portfolio Early Warning Triggers (Total: 28 Active Alerts):
-─────────────────────────────────────────────────────────────────────────────
-• [CRITICAL] PRJ-0042 (Western DFC)       : Financial burn gap (12.3%) outpaces site progress
-• [HIGH]     PRJ-0118 (NH-44 Expressway)  : 38% critical path milestones delayed > 90 days
-• [HIGH]     PRJ-0205 (Kudankulam Unit 3) : Milestone slippage ratio = 0.42
-• [MEDIUM]   PRJ-0341 (Mumbai Metro L4)   : Elapsed duration (78%) outpaces civil completion (61%)
-─────────────────────────────────────────────────────────────────────────────
-✓ Full early warning logs and resolution workflows available at /dashboard/alerts`,
-          type: 'warning',
-          timestamp: now,
-        },
-      ])
-      setSelectedWorkflowStep(2)
-      return
-    }
-
-    if (clean.includes('ask') || clean.includes('ai') || clean.includes('chat')) {
-      const question = raw.replace(/^pragati\s+ask\s+/i, '').replace(/["']/g, '').trim()
-      setTerminalLogs((prev) => [
-        ...prev,
-        {
-          command: raw,
-          output: `[PRAGATI AI] Query: "${question || 'Why is PRJ-0042 flagged with High Cost Risk?'}"
-─────────────────────────────────────────────────────────────────────────────
-"PRJ-0042 (Western Dedicated Freight Corridor) has incurred ₹38,650.00 Cr (75.2% of sanctioned budget) against physical completion of 62.9%, creating an anomalous 12.3% burn gap. Local SHAP attribution confirms this financial-physical divergence (+0.31) and remaining critical civil milestones (+0.24) are the primary drivers for the 0.74 Cost Overrun probability."`,
-          type: 'info',
-          timestamp: now,
-        },
-      ])
-      setSelectedWorkflowStep(3)
-      return
-    }
-
-    if (clean.includes('stat')) {
-      setTerminalLogs((prev) => [
-        ...prev,
-        {
-          command: raw,
-          output: `[PORTFOLIO STATS] National Infrastructure Portfolio Summary:
-─────────────────────────────────────────────────────────────────────────────
-• Total Monitored Projects : 850 Assets (₹150 Cr & Above)
-• Central Ministries       : 17 Ministries (Railways, MoRTH, Power, Shipping, etc.)
-• Key Sectors              : 6 Sectors
-• Original Sanctioned Cost : ₹ 37,13,890.00 Cr
-• Revised Sanctioned Cost  : ₹ 42,78,120.00 Cr (+15.2% Cost Escalation)
-• Cumulative Expenditure   : ₹ 20,36,412.50 Cr (54.8% Outlay Realized)
-• Portfolio Risk Breakdown : 142 High Risk | 318 Medium Risk | 390 Low Risk`,
-          type: 'success',
-          timestamp: now,
-        },
-      ])
-      return
-    }
-
-    // Default unrecognized
-    setTerminalLogs((prev) => [
-      ...prev,
-      {
-        command: raw,
-        output: `Command not recognized: '${raw}'
-Type 'pragati --help' to view available commands.`,
-        type: 'error',
-        timestamp: now,
-      },
-    ])
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      executeCommand(terminalInput)
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      if (commandHistory.length > 0) {
-        const nextIdx = historyIndex + 1 < commandHistory.length ? historyIndex + 1 : historyIndex
-        setHistoryIndex(nextIdx)
-        setTerminalInput(commandHistory[commandHistory.length - 1 - nextIdx] || '')
-      }
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      if (historyIndex > 0) {
-        const nextIdx = historyIndex - 1
-        setHistoryIndex(nextIdx)
-        setTerminalInput(commandHistory[commandHistory.length - 1 - nextIdx] || '')
-      } else if (historyIndex === 0) {
-        setHistoryIndex(-1)
-        setTerminalInput('')
-      }
-    }
-  }
 
   const workflowSteps = [
     {
@@ -291,7 +53,6 @@ Type 'pragati --help' to view available commands.`,
       ],
       ctaText: 'Explore Data Lab & Projects',
       ctaHref: '/dashboard/data-lab',
-      terminalCmd: 'pragati ingest --sample',
     },
     {
       stepNumber: '2',
@@ -310,7 +71,6 @@ Type 'pragati --help' to view available commands.`,
       ],
       ctaText: 'View Predictive Analytics',
       ctaHref: '/dashboard/analytics',
-      terminalCmd: 'pragati predict PRJ-0042',
     },
     {
       stepNumber: '3',
@@ -329,7 +89,6 @@ Type 'pragati --help' to view available commands.`,
       ],
       ctaText: 'Review Early Warning Alerts',
       ctaHref: '/dashboard/alerts',
-      terminalCmd: 'pragati explain PRJ-0042',
     },
     {
       stepNumber: '4',
@@ -348,7 +107,6 @@ Type 'pragati --help' to view available commands.`,
       ],
       ctaText: 'Launch PRAGATI AI Assistant',
       ctaHref: '/dashboard/assistant',
-      terminalCmd: 'pragati ask "Why is PRJ-0042 at risk?"',
     },
   ]
 
@@ -637,10 +395,7 @@ Type 'pragati --help' to view available commands.`,
                 <button
                   key={step.stepNumber}
                   type="button"
-                  onClick={() => {
-                    setSelectedWorkflowStep(idx)
-                    executeCommand(step.terminalCmd)
-                  }}
+                  onClick={() => setSelectedWorkflowStep(idx)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                     selectedWorkflowStep === idx
                       ? 'bg-blue-700 text-white shadow-xs'
@@ -663,10 +418,7 @@ Type 'pragati --help' to view available commands.`,
               return (
                 <div
                   key={step.stepNumber}
-                  onClick={() => {
-                    setSelectedWorkflowStep(idx)
-                    executeCommand(step.terminalCmd)
-                  }}
+                  onClick={() => setSelectedWorkflowStep(idx)}
                   className={`flex flex-col justify-between rounded-2xl p-5 sm:p-6 transition-all duration-300 border cursor-pointer group ${
                     isSelected
                       ? 'bg-white border-blue-500 shadow-md ring-2 ring-blue-500/20 -translate-y-1'
@@ -747,112 +499,6 @@ Type 'pragati --help' to view available commands.`,
                 </div>
               )
             })}
-          </div>
-
-          {/* INTERACTIVE PRAGATI CLI TERMINAL */}
-          <div className="mt-8 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-lg overflow-hidden flex flex-col backdrop-blur-xs">
-            {/* Terminal Window Header */}
-            <div className="px-4 py-2.5 bg-slate-800/85 border-b border-slate-700/70 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/90 inline-block shadow-2xs" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/90 inline-block shadow-2xs" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/90 inline-block shadow-2xs" />
-                </div>
-                <div className="flex items-center gap-2 pl-2 border-l border-slate-700/60">
-                  <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-xs font-mono text-slate-300 font-semibold tracking-wide">
-                    pragati-cli &bull; Infrastructure Telemetry Console
-                  </span>
-                </div>
-              </div>
-
-              {/* Minimalist Essential Controls */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => executeCommand('pragati --help')}
-                  className="px-2.5 py-1 rounded-md bg-slate-700/70 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-600/70 font-mono text-xs transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <span>--help</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCommand('clear')}
-                  title="Clear Console"
-                  className="px-2 py-1 rounded-md bg-slate-700/60 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-600/60 font-mono text-xs transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span className="hidden sm:inline">clear</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Terminal Output Stream with Internal Scrolling */}
-            <div
-              ref={terminalContainerRef}
-              className="p-4 font-mono text-xs max-h-[260px] overflow-y-auto space-y-2.5 bg-slate-950/70 text-slate-200 scrollbar-thin scrollbar-thumb-slate-700"
-            >
-              {terminalLogs.length === 0 ? (
-                <div className="text-slate-500 italic py-2">
-                  Console cleared. Type <span className="text-cyan-400 font-semibold">pragati --help</span> or click <span className="text-slate-300 font-semibold">[--help]</span> to display commands.
-                </div>
-              ) : (
-                terminalLogs.map((log, idx) => (
-                  <div key={idx} className="space-y-1">
-                    {/* Prompt Line */}
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <span className="text-emerald-400 font-bold">admin@pragati</span>
-                      <span className="text-slate-600">:</span>
-                      <span className="text-blue-400">~</span>
-                      <span className="text-slate-500">$</span>
-                      <span className="text-slate-100 font-semibold">{log.command}</span>
-                      <span className="text-[10px] text-slate-500 ml-auto font-mono">{log.timestamp}</span>
-                    </div>
-
-                    {/* Output Block */}
-                    <div
-                      className={`pl-3 border-l-2 py-0.5 whitespace-pre-wrap leading-relaxed ${
-                        log.type === 'error'
-                          ? 'border-rose-500/80 text-rose-300'
-                          : log.type === 'warning'
-                          ? 'border-amber-500/80 text-amber-200'
-                          : log.type === 'success'
-                          ? 'border-emerald-500/80 text-emerald-300'
-                          : 'border-cyan-500/80 text-slate-300'
-                      }`}
-                    >
-                      {log.output}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Interactive Command Input Box */}
-            <div className="p-2.5 bg-slate-900/95 border-t border-slate-800 flex items-center gap-2">
-              <span className="text-emerald-400 font-mono text-xs font-bold shrink-0 pl-1">
-                pragati &gt;
-              </span>
-              <input
-                ref={terminalInputRef}
-                type="text"
-                value={terminalInput}
-                onChange={(e) => setTerminalInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type command (e.g. pragati --help, pragati predict PRJ-0042, clear)..."
-                className="flex-1 bg-transparent text-white placeholder-slate-500 font-mono text-xs focus:outline-none border-none"
-              />
-              <button
-                type="button"
-                onClick={() => executeCommand(terminalInput)}
-                disabled={!terminalInput.trim()}
-                className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:hover:bg-blue-600 text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <span>Run</span>
-                <Send className="w-3 h-3" />
-              </button>
-            </div>
           </div>
         </div>
       </section>

@@ -92,20 +92,20 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative w-8 h-10 shrink-0 flex items-center justify-center">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="relative w-9 h-9 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
                 <Image
-                  src="/images/emblem.png"
-                  alt="State Emblem of India"
-                  width={32}
-                  height={40}
+                  src="/logo.png"
+                  alt="PRAGATI Logo"
+                  width={36}
+                  height={36}
                   className="object-contain"
                   priority
                 />
               </div>
-              <div className="border-l border-slate-200 pl-3">
+              <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base font-extrabold tracking-tight text-slate-900">
+                  <span className="text-base font-extrabold tracking-tight text-slate-900 group-hover:text-blue-700 transition-colors">
                     PRAGATI
                   </span>
                   <span className="text-[9px] uppercase font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 tracking-wider">

@@ -2,8 +2,9 @@
 
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Building2, Shield, Info, ExternalLink } from 'lucide-react'
+import { Shield, Info, ExternalLink } from 'lucide-react'
 
 export function Footer() {
   const pathname = usePathname()
@@ -19,8 +20,14 @@ export function Footer() {
           {/* Col 1: System info */}
           <div className="md:col-span-2 space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-md bg-blue-700 text-white flex items-center justify-center font-bold text-xs">
-                <Building2 className="w-4 h-4" />
+              <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 flex items-center justify-center">
+                <Image
+                  src="/logo.png"
+                  alt="PRAGATI Logo"
+                  width={28}
+                  height={28}
+                  className="object-contain"
+                />
               </div>
               <span className="font-bold tracking-tight text-slate-900 text-sm">
                 PRAGATI Monitoring Platform

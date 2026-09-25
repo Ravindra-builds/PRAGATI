@@ -1,101 +1,138 @@
-# SIH 2026: AI-Powered Infrastructure Project Monitoring & Early Warning System
+# PRAGATI: AI-Powered Infrastructure Project Monitoring & Early Warning System
 
-An intelligent predictive analytics and early warning prototype for national infrastructure project monitoring using PAIMANA / OCMS-style tracking data.
-
----
-
-## 1. Project Purpose
-
-Large-scale infrastructure initiatives often suffer from compounding schedule slippages and severe budget escalations. This project provides an AI-powered Early Warning System (EWS) to detect delay trajectories and cost-overrun risks early in project execution cycles, enabling proactive interventions by ministry and project authorities.
+An intelligent predictive analytics, early warning, and grounded decision support platform for national infrastructure project monitoring aligned with MoSPI PAIMANA / OCMS tracking conventions.
 
 ---
 
-## 2. Current Development Stage
+## 1. Project Purpose & Vision
+
+Large-scale national infrastructure initiatives (costing ₹150 Cr and above) often suffer from compounding schedule slippages and severe capital budget escalations. **PRAGATI** provides an AI-powered Early Warning System (EWS) and decision support platform to detect delay trajectories and cost-overrun risks months in advance, enabling timely, data-backed interventions by central ministries, state authorities, and project monitoring directors.
+
+---
+
+## 2. Key Platform Capabilities
 
 > [!NOTE]
-> **Completed Capabilities:**
-> - **ML Workspace & Pipeline**: Leakage-safe feature engineering, project-grouped temporal holdouts, and trained models (`Logistic Regression` for Cost Overrun, `Random Forest` for Time Overrun).
-> - **ML Inference Microservice**: FastAPI service (`ml/api/main.py`) serving dual-target probability estimates via `/predict` and metadata via `/model-info`.
-> - **PostgreSQL Data Layer**: Relational schema managed via Prisma ORM (`projects`, `project_updates`, `predictions`, `early_warnings`).
-> - **Next.js Backend API Routes**: App Router endpoints for project querying, snapshot history, prediction retrieval, early warnings, portfolio analytics, and AI assistant chat.
-> - **Risk & Early Warning Engine**: Deterministic prototype rule engine evaluating cost escalation, delay trajectories, milestone slippage, and expenditure burn anomalies.
-> - **PRAGATI Project Intelligence Assistant**: Grounded LLM reasoning layer (`/dashboard/assistant`) enforcing the zero-calculation rule, XML prompt injection containment, 4-way semantic categorization, advisory verb guardrails, and multi-provider abstraction (Google Gemini, OpenAI-compatible, offline mock).
-> - **Testing & Quality**: 34 Python ML unit tests and 44 TypeScript backend/assistant unit and integration tests passing.
+> ### Completed Production Capabilities:
+> - **PRAGATI Data Lab (`/dashboard/data-lab`)**:
+>   - Multi-format ingestion engine supporting **PDF inspection dossiers**, **Excel spreadsheets (`.xlsx`)**, **CSV**, **JSON**, and **Text/Markdown reports**.
+>   - Dynamic schema validation and intelligent parameter alignment with PAIMANA/MoSPI aliases.
+>   - Strict target outcome quarantine to prevent future label leakage.
+>   - Real-time dual-target ML risk scoring and local SHAP feature attribution before persistence.
+>   - One-click dataset persistence to PostgreSQL with transaction isolation.
+>   - Interactive Expected Parameters Guide and 5 ready-to-run ministry sample datasets.
+> - **Interactive State-Wise Projects Map (`/dashboard/projects`)**:
+>   - Interactive vector choropleth map of India (`@svg-maps/india`) spanning all 28 states and 8 UTs.
+>   - 3 visualization modes: **Project Count**, **AI Risk Exposure Heatmap**, and **Capital Allocation**.
+>   - Real-time state telemetry card (sanctioned cost, cumulative expenditure, high-risk count, physical progress %, burn gap %).
+>   - Custom searchable state selector and click-to-filter integration with the 850-project directory.
+> - **Dual-Target Predictive ML Engine**:
+>   - Leakage-safe feature engineering with separate binary classification models: **Logistic Regression** (Cost Overrun) and **Random Forest** (Schedule Delay).
+>   - Calibrated 0.00 – 1.00 risk probabilities audited against 850 central assets.
+> - **Local SHAP Explainability & Early Warnings (`/dashboard/alerts`)**:
+>   - Shapley value factor decomposition surfacing top positive and negative risk contributors.
+>   - Deterministic rule engine monitoring financial-physical burn gaps, milestone slippages, and duration elapsed.
+> - **PRAGATI Intelligence Assistant (`/dashboard/assistant`)**:
+>   - Grounded LLM reasoning layer enforcing zero-calculation rules, prompt injection containment, 4-way semantic classification, and multi-provider abstraction (Google Gemini, OpenAI-compatible, offline mock).
+> - **Portfolio Analytics & Comparison (`/dashboard/analytics`)**:
+>   - Sector allocations, financial burn curves, cost vs. time overrun scatter plots, and side-by-side asset comparison benchmarks.
+> - **Automated Test Coverage**: **93 tests passing** (59 TypeScript backend/Data Lab/assistant integration tests + 34 Python ML tests).
 
 ---
 
 ## 3. Monorepo Repository Structure
 
 ```text
-sih-infrastructure-monitoring/
+infrastructure-monitoring/
 │
-├── app/                      # Next.js App Router
-│   ├── api/                  # Backend API routes
-│   │   ├── alerts/           # Early warning alerts filtering and summary endpoints
-│   │   ├── analytics/        # Portfolio aggregations, sector distributions, and correlation data
-│   │   ├── assistant/        # Grounded AI assistant chat endpoint (POST /api/assistant/chat)
-│   │   └── projects/         # Project querying, snapshots, and prediction endpoints
-│   ├── dashboard/            # Institutional Web Application Workspaces
-│   │   ├── alerts/           # Early Warning Center & triage queue
-│   │   ├── analytics/        # Portfolio analytics, scatter plots, and project comparison
-│   │   ├── assistant/        # PRAGATI Project Intelligence Assistant workspace
-│   │   ├── projects/         # Projects directory and project detail dossiers
-│   │   ├── layout.tsx        # Dashboard shell layout with institutional navigation
-│   │   └── page.tsx          # Executive Portfolio Overview
-│   ├── layout.tsx            # Root HTML layout
-│   └── page.tsx              # Application landing portal
+├── app/                          # Next.js App Router
+│   ├── api/                      # Backend API Endpoints
+│   │   ├── alerts/               # Early warning triage & summary endpoints
+│   │   ├── analytics/            # Portfolio metrics, sector distributions & scatter data
+│   │   │   └── compare/          # Side-by-side project comparison endpoint
+│   │   ├── assistant/chat/       # Grounded AI assistant chat endpoint
+│   │   ├── dashboard/summary/    # Executive summary metrics endpoint
+│   │   ├── data-lab/             # PRAGATI Data Lab ingestion & inference endpoints
+│   │   │   ├── parse/            # Multi-format document parser (PDF, Excel, CSV, JSON)
+│   │   │   ├── predict/          # In-memory ML risk scoring & SHAP driver computation
+│   │   │   └── save/             # Database persistence endpoint
+│   │   └── projects/             # Projects directory, detail dossiers, snapshots & predictions
+│   ├── dashboard/                # Institutional Web Workspaces
+│   │   ├── alerts/               # Early Warning Center & alert triage queue
+│   │   ├── analytics/            # Portfolio analytics, scatter plots & project comparison
+│   │   ├── assistant/            # PRAGATI Intelligence Assistant workspace
+│   │   ├── data-lab/             # Data Lab ingestion, parameter mapping & validation UI
+│   │   ├── projects/             # Projects directory & interactive State Map section
+│   │   │   └── [projectId]/      # Comprehensive project dossier & SHAP waterfall charts
+│   │   ├── layout.tsx            # Dashboard workspace layout
+│   │   └── page.tsx              # Executive Portfolio Overview
+│   ├── layout.tsx                # Root layout with metadata, favicon suite & navigation
+│   ├── not-found.tsx             # Branded 404 handler
+│   └── page.tsx                  # Home landing page with horizontal How It Works pipeline
 │
-├── components/               # Reusable frontend UI components
-│   ├── alerts/               # Alert triage cards, filters, and evidence modals
-│   ├── analytics/            # Sector charts, scatter plots, and project comparison tools
-│   ├── layout/               # Institutional header, navbar, and footer
-│   └── project-detail/       # Project dossier, SHAP driver bars, and S-curves
+├── components/                   # Reusable UI Component Library
+│   ├── ai/                       # Floating chat bot & assistant components
+│   ├── alerts/                   # Alert triage cards, filters & evidence dialogs
+│   ├── analytics/                # Sector breakdown, scatter plots & comparison matrix
+│   ├── data-lab/                 # Multi-format uploader, column mapper & parameter guide
+│   ├── layout/                   # Navbar, footer, and institutional headers
+│   ├── project-detail/           # Project dossier, S-curves, milestones & SHAP drivers
+│   └── projects/                 # India State Map & State Projects telemetry section
 │
-├── docs/                     # System architecture and design documentation
-│   ├── ARCHITECTURE.md       # High-level architecture, layer responsibilities & data flow
-│   └── AI_ASSISTANT.md       # Complete PRAGATI Intelligence Assistant architecture & guide
+├── docs/                         # System Architecture Documentation
+│   ├── ARCHITECTURE.md           # High-level architecture, layer responsibilities & data flow
+│   └── AI_ASSISTANT.md           # Complete PRAGATI Intelligence Assistant architecture
 │
-├── lib/                      # Backend services and utilities
-│   ├── ai/                   # Grounded AI intelligence engine
-│   │   ├── providers/        # LLM providers (Mock, Gemini, OpenAI-compatible)
-│   │   ├── context-builder.ts# Entity resolution & deterministic context assembly
-│   │   ├── conversation-store.ts # In-memory session and audit storage
-│   │   ├── prompts.ts        # Dedicated system prompt & grounding formatting
-│   │   ├── provider-factory.ts # Dynamic provider instantiator
-│   │   └── types.ts          # Strongly-typed schemas and interfaces
-│   ├── db.ts                 # Prisma Client singleton
-│   ├── ml-client.ts          # Dedicated FastAPI ML service client with Zod validation
-│   ├── risk-engine.ts        # Prototype risk scoring and early warning rule triggers
-│   └── services/             # Project, analytics, alert, and prediction domain services
+├── lib/                          # Core Business Logic & Services
+│   ├── ai/                       # Grounded AI assistant engine & LLM providers
+│   ├── data-lab/                 # Data Lab extractors, normalizers, validators & persistence
+│   │   ├── cleaners.ts           # Currency, percentage & date normalizers
+│   │   ├── extractors.ts         # PDF, XLSX, CSV, JSON & Text extractors
+│   │   ├── mapping.ts            # Dynamic column mapper & MoSPI alias dictionary
+│   │   ├── service.ts            # Persistence & Prisma database service
+│   │   ├── types.ts              # Data Lab schemas & type definitions
+│   │   └── validators.ts         # Schema validation & anti-leakage quarantine rules
+│   ├── db.ts                     # Prisma Client singleton
+│   ├── ml-client.ts              # Dedicated ML service client with Zod schema validation
+│   ├── risk-engine.ts            # Risk index calculator & early warning rules
+│   └── services/                 # Project, analytics, alert, and synthetic dataset services
 │
-├── ml/                       # Isolated Python Machine Learning Workspace
-│   ├── api/                  # FastAPI inference microservice (main.py, schemas.py, service.py)
-│   ├── data/                 # Raw, processed, and synthetic datasets
-│   ├── models/               # Serialized pipelines (model.joblib) & metadata (metadata.json)
-│   ├── reports/              # Model comparison, EDA figures, and evaluation reports
-│   ├── src/                  # Core feature engineering, modeling & validation scripts
-│   └── tests/                # ML unit and API test suite (34 passing tests)
+├── ml/                           # Python Machine Learning Workspace
+│   ├── api/                      # FastAPI inference microservice (`main.py`, `service.py`)
+│   ├── data/                     # Raw, processed, and synthetic datasets
+│   ├── models/                   # Serialized pipelines (`model.joblib`) & `metadata.json`
+│   ├── src/                      # Feature engineering, training & SHAP explainers
+│   └── tests/                    # ML test suite (34 passing unit & API tests)
 │
-├── prisma/                   # PostgreSQL schema and migrations
-│   ├── schema.prisma         # Relational database models and constraints
-│   └── migrations/           # Tracked PostgreSQL SQL migrations
+├── prisma/                       # PostgreSQL Relational Schema
+│   ├── schema.prisma             # Relational data models & constraints
+│   └── migrations/               # SQL migrations
 │
-├── scripts/                  # Development scripts
-│   ├── seed-projects.ts      # Seeds projects and snapshots from synthetic CSV
-│   ├── seed-predictions.ts   # Generates batch predictions via ML service
-│   └── verify_env.py         # Python environment verification
+├── public/                       # Static Assets & Branding
+│   ├── favicon.ico               # Official platform favicon
+│   ├── favicon-16x16.png         # 16x16 Favicon
+│   ├── favicon-32x32.png         # 32x32 Favicon
+│   ├── apple-touch-icon.png      # 180x180 Apple touch icon
+│   ├── android-chrome-192x192.png# 192x192 Android icon
+│   ├── android-chrome-512x512.png# 512x512 Android icon
+│   ├── site.webmanifest          # PWA Web Manifest
+│   ├── logo.png                  # Official PRAGATI brand logo
+│   └── images/                   # HD hero montage & vector emblem
 │
-├── tests/                    # TypeScript test suites (44 passing tests)
-│   ├── api.test.ts           # ML client boundary checks and risk rules
-│   ├── assistant.test.ts     # AI assistant grounding, injection defense & mock provider
-│   ├── database.test.ts      # Schema constraints, duplicate prevention & relationships
-│   ├── frontend.test.ts      # Frontend component smoke checks
-│   └── integration.test.ts   # End-to-end prediction and warning flow
+├── scripts/                      # Utility & Seeding Scripts
+│   ├── seed-projects.ts          # Seeds projects from synthetic dataset
+│   └── seed-predictions.ts       # Generates batch ML predictions
 │
-├── docker-compose.yml        # Local PostgreSQL container configuration
-├── .env.example              # Environment variables template
-├── COMMANDS.md               # Master reference for all developer commands
-└── package.json              # Next.js project configuration and scripts
+├── tests/                        # Automated TypeScript Test Suites (59 passing tests)
+│   ├── api.test.ts               # ML client boundary & risk rules tests
+│   ├── assistant.test.ts         # AI assistant grounding & prompt injection tests
+│   ├── data-lab.test.ts          # Multi-format extraction, mapping, validation & ML tests
+│   ├── database.test.ts          # Schema constraints & foreign key tests
+│   ├── frontend.test.ts          # Component smoke tests
+│   └── integration.test.ts       # End-to-end prediction & alert flow tests
+│
+├── COMMANDS.md                   # Developer operational reference
+└── package.json                  # Next.js configuration and dependencies
 ```
 
 ---
@@ -103,9 +140,9 @@ sih-infrastructure-monitoring/
 ## 4. Setup & Getting Started
 
 ### Prerequisites
-- **Node.js**: v18+ (tested on v24.x) & npm
-- **Python**: v3.10+ (tested on v3.13.x)
-- **PostgreSQL**: Local instance or Docker (`docker compose up -d`)
+- **Node.js**: v18+ (tested on v20.x / v22.x / v24.x) & npm
+- **Python**: v3.10+ (tested on v3.11 / v3.13)
+- **PostgreSQL**: Local instance, Neon Cloud, or Docker (`docker compose up -d`)
 
 ---
 
@@ -127,11 +164,11 @@ Ensure `DATABASE_URL` points to your PostgreSQL database and `ML_SERVICE_URL` po
    ```bash
    npm run db:generate
    ```
-3. **Push Schema to PostgreSQL**:
+3. **Push Schema to Database**:
    ```bash
    npm run db:push
    ```
-4. **Seed Project Data**:
+4. **Seed Monitored Infrastructure Assets**:
    ```bash
    npm run seed
    ```
@@ -139,11 +176,11 @@ Ensure `DATABASE_URL` points to your PostgreSQL database and `ML_SERVICE_URL` po
 ---
 
 ### Step 3: Start the ML Inference Microservice
-From the repository root (PowerShell):
+From the repository root (PowerShell / Bash):
 ```powershell
 .\ml\.venv\Scripts\python.exe -m uvicorn ml.api.main:app --reload --port 8000
 ```
-- Interactive docs available at: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Interactive OpenAPI documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
@@ -155,7 +192,7 @@ npm run dev
 
 ---
 
-## 5. Backend API Reference
+## 5. Complete Backend API Reference
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
@@ -166,34 +203,51 @@ npm run dev
 | `POST` | `/api/projects/:projectId/predict` | Server-side prediction orchestration via ML service + warning generation |
 | `GET` | `/api/alerts` | Filter early warning queue by severity, type, sector, or project ID |
 | `GET` | `/api/analytics` | Portfolio metrics, sector aggregations, and scatter plot correlations |
+| `GET` | `/api/analytics/compare` | Side-by-side comparative analytics between two projects |
+| `GET` | `/api/dashboard/summary` | Executive summary metrics, risk distribution, and urgent attention assets |
+| `POST` | `/api/data-lab/parse` | Parse uploaded multi-format project files (PDF, XLSX, CSV, JSON, TXT) |
+| `POST` | `/api/data-lab/predict` | Execute dual ML risk predictions & SHAP driver attribution on in-memory records |
+| `POST` | `/api/data-lab/save` | Validate and persist ingested project datasets into PostgreSQL database |
 | `POST` | `/api/assistant/chat` | PRAGATI Intelligence Assistant grounded Q&A with multi-provider fallback |
 
 ---
 
-## 6. Running Tests
+## 6. Running Tests & Verification
 
-### Backend, Assistant & UI Unit Tests (TypeScript)
+### Automated Full-Stack Test Suite
+
+#### 1. TypeScript Backend, Data Lab & Assistant Tests (59 Tests)
 ```bash
 npm run test:backend
 ```
-*Runs all 44 automated tests across database constraints, ML client boundary validation, risk engine rules, early warnings, analytics, and PRAGATI Intelligence Assistant grounding.*
+*Runs 59 automated tests covering:*
+- ML client boundary validation & risk calculation logic.
+- PRAGATI Data Lab multi-format file extraction (PDF, XLSX, CSV, JSON, TXT).
+- Column alias auto-mapping & target outcome quarantine validation.
+- Currency, percentage, and date string cleaning and normalizers.
+- Database schema constraints, composite uniqueness, and anti-leakage rules.
+- Grounded AI assistant context assembly, prompt injection containment, and fallback handling.
 
-To run only the Assistant test suite:
-```bash
-npx tsx --test tests/assistant.test.ts
-```
-
-### Machine Learning Unit Tests (Python)
+#### 2. Machine Learning Unit Tests (Python - 34 Tests)
 ```powershell
 .\ml\.venv\Scripts\python.exe -m unittest discover -s ml/tests -v
 ```
 *Runs 34 tests across feature engineering, split disjointness, model pipelines, SHAP explainers, and FastAPI endpoints.*
 
-### Production Build Verification
+#### 3. Production Build Compilation
 ```bash
 npm run build
 ```
+*Compiles all static, dynamic, and icon routes with zero TypeScript or bundling errors.*
 
 ---
 
-*For detailed commands and operational guides, refer to [`COMMANDS.md`](COMMANDS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).*
+## 7. Institutional Governance & Compliance
+
+- **Target Outcome Quarantine Enforced**: Downstream actual outcomes (`cost_overrun`, `time_overrun`, `delay_months`, etc.) are strictly prohibited from entering input features, ingestion mapping, or prediction payloads to guarantee zero target leakage.
+- **SHAP Local Explainability**: Every ML prediction is accompanied by Shapley value attributions, explaining feature impacts with directional indicators.
+- **MoSPI PAIMANA / OCMS Standards Alignment**: Metric definitions, burn gap formulas, milestone structures, and reporting terminology are calibrated to official Indian infrastructure monitoring conventions.
+
+---
+
+*For developer operations and command shortcuts, refer to [`COMMANDS.md`](COMMANDS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).*
