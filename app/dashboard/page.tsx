@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Building2,
   AlertTriangle,
-  Flame,
+  ShieldAlert,
   IndianRupee,
   Activity,
   ArrowRight,
@@ -272,7 +272,7 @@ export default function DashboardPage() {
             value={data.criticalProjects}
             subtext="Severe dual overrun risk"
             accent="danger"
-            icon={<Flame className="w-4 h-4 text-rose-600" />}
+            icon={<ShieldAlert className="w-4 h-4 text-rose-600" />}
             badge={{
               text: `${data.totalProjects > 0 ? ((data.criticalProjects / data.totalProjects) * 100).toFixed(0) : 0}%`,
               variant: 'danger',

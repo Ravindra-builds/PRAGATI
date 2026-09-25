@@ -70,16 +70,16 @@ function AssistantContent() {
   const starterPrompts = activeProjectId
     ? [
         `Why is ${activeProjectId} considered high risk?`,
-        `What are the main warning signals for ${activeProjectId}?`,
-        `What is driving schedule risk for ${activeProjectId}?`,
-        `What should the monitoring team review for this project?`,
+        `What are the active early warning signals for ${activeProjectId}?`,
+        `What is driving the schedule delay risk for ${activeProjectId}?`,
+        `What remedial actions should the monitoring committee review?`,
       ]
     : [
-        'Which projects need the most attention?',
-        'Which sectors have the highest predicted risk?',
-        'Show projects where financial progress is substantially ahead of physical progress.',
-        'What are the strongest portfolio-level warning patterns?',
-        'Compare PRJ-0016 and PRJ-0004.',
+        'Which Railway and Road Transport projects have critical cost overrun warnings?',
+        'Show projects where financial expenditure is substantially ahead of physical progress',
+        'Which states have the highest concentration of delayed projects?',
+        'What are the strongest portfolio-level early warning patterns?',
+        'Compare risk trajectory between PRJ-0016 and PRJ-0004',
       ]
 
   const handleSendMessage = async (textToSend?: string) => {

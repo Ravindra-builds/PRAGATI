@@ -15,7 +15,7 @@ import {
   CheckCircle2,
   HelpCircle,
   BarChart3,
-  Flame,
+  ShieldAlert,
   ArrowRight,
   Search,
   Check,
@@ -467,8 +467,8 @@ export function StateProjectsSection({
                   <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition-colors space-y-1">
                     <div className="flex items-center justify-between text-xs font-medium text-slate-500">
                       <span className="flex items-center gap-1.5">
-                        <Flame className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Expenditure Burn Gap</span>
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Expenditure Disparity Gap</span>
                       </span>
                       <span title="Positive value indicates financial outlays are ahead of physical site delivery">
                         <HelpCircle className="w-3 h-3 text-slate-400" />

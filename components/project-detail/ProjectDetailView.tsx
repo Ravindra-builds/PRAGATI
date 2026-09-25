@@ -8,7 +8,7 @@ import {
   Zap,
   CheckCircle2,
   AlertTriangle,
-  Flame,
+  ShieldAlert,
   Clock,
   Bot,
 } from 'lucide-react'
@@ -160,7 +160,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         throw new Error(data.message || data.error || 'Prediction generation failed')
       }
 
-      setPredictSuccess('Real-time AI prediction & SHAP attribution updated!')
+      setPredictSuccess('Predictive risk assessment and factor impact updated successfully.')
 
       // If drivers returned from FastAPI
       if (data.drivers && data.drivers.cost && data.drivers.cost.length > 0) {
@@ -274,7 +274,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             className="inline-flex items-center gap-2 h-8 px-3 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-xs hover:shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Zap className={`w-3.5 h-3.5 ${predicting ? 'animate-spin' : ''}`} />
-            <span>{predicting ? 'Running Inference...' : 'Run AI Prediction'}</span>
+            <span>{predicting ? 'Evaluating Risk Telemetry...' : 'Assess Project Risk'}</span>
           </button>
         </div>
       </div>
@@ -359,7 +359,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-rose-50 text-rose-600">
-                <Flame className="w-4 h-4" />
+                <ShieldAlert className="w-4 h-4" />
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
                 Cost Overrun Risk
@@ -556,7 +556,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             </div>
 
             <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between text-xs mt-1.5">
-              <span className="text-slate-600">Financial Burn Gap:</span>
+              <span className="text-slate-600">Expenditure vs Physical Gap:</span>
               <span
                 className={`font-mono font-bold ${
                   burnGap >= 15 ? 'text-rose-600' : burnGap >= 5 ? 'text-amber-600' : 'text-slate-700'

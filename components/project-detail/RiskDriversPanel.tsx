@@ -115,7 +115,7 @@ export function RiskDriversPanel({
         </div>
       ) : (
         <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-center text-xs text-slate-500">
-          Click <span className="font-semibold text-blue-700">&quot;Run AI Prediction&quot;</span> above to compute real-time SHAP feature attribution.
+          Click <span className="font-semibold text-blue-700">&quot;Assess Project Risk&quot;</span> above to compute real-time factor risk attribution.
         </div>
       )}
 

@@ -71,14 +71,14 @@ export function FloatingChatBot() {
 
   const starterChips = detectedProjectId
     ? [
-        `Why is ${detectedProjectId} at risk?`,
-        `What are the warning signals for ${detectedProjectId}?`,
-        'What is PRAGATI and what does it mean?',
+        `What are the critical risk drivers for ${detectedProjectId}?`,
+        `Summarize delivery milestones and delays for ${detectedProjectId}`,
+        `What are the active early warnings for ${detectedProjectId}?`,
       ]
     : [
-        'What is PRAGATI and what does it mean?',
-        'Which projects need immediate attention?',
-        'Which sectors have highest cost risk?',
+        'Which Railway projects face critical cost overrun risks?',
+        'Show projects where financial expenditure outpaces physical delivery',
+        'Summarize high-risk infrastructure projects across states',
       ]
 
   const handleSendMessage = async (textToSend?: string) => {

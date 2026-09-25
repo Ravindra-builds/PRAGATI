@@ -120,7 +120,7 @@ export function ModelPerformanceSection() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <span>Target 1: Cost Overrun Model (cost_overrun)</span>
+              <span>Target 1: Cost Overrun Evaluation</span>
               <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 Active: Logistic Regression
               </span>
@@ -179,7 +179,7 @@ export function ModelPerformanceSection() {
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <span>Target 2: Schedule Delay Model (time_overrun)</span>
+              <span>Target 2: Schedule Delay Evaluation</span>
               <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 Active: Random Forest
               </span>
