@@ -42,9 +42,9 @@ export default function HomePage() {
       icon: Database,
       accentColor: 'from-cyan-600 to-blue-600',
       badgeColor: 'border-cyan-200 bg-cyan-50 text-cyan-800',
-      headline: 'Ingest & Standardize. Real-Time Telemetry Pipeline.',
+      headline: 'Ingest & Standardize Project Data',
       description:
-        'Continuous ingestion of monthly project snapshots across 850 infrastructure assets, standardizing expenditure, physical progress, and milestone schedules across formats.',
+        'Collect, validate and standardize project-monitoring data.',
       bullets: [
         'Automated parsing of MoSPI PAIMANA & OCMS datasets',
         'Ingests physical progress, financial expenditure & milestones',
@@ -60,14 +60,14 @@ export default function HomePage() {
       icon: Cpu,
       accentColor: 'from-blue-600 to-indigo-600',
       badgeColor: 'border-blue-200 bg-blue-50 text-blue-800',
-      headline: 'Forecast Risk. Dual-Target ML Classification.',
+      headline: 'Predict Risk with Dual-Target ML',
       description:
-        'Independent binary classification models compute calibrated probability scores for Cost Overrun (Logistic Regression) and Schedule Delay (Random Forest) months before escalation.',
+        'Separate models estimate cost-overrun and schedule-delay risk.',
       bullets: [
         'Dual-target models: Cost Overrun & Schedule Delay',
         'Calibrated risk probability scoring (0.00 – 1.00 index)',
         'Duration ratio & financial burn-gap feature engineering',
-        'Zero black-box outputs: audited against 850 live assets',
+        'Zero black-box outputs: audited across 850 monitored assets',
       ],
       ctaText: 'View Predictive Analytics',
       ctaHref: '/dashboard/analytics',
@@ -78,12 +78,12 @@ export default function HomePage() {
       icon: ShieldAlert,
       accentColor: 'from-indigo-600 to-violet-600',
       badgeColor: 'border-indigo-200 bg-indigo-50 text-indigo-800',
-      headline: 'Explain & Alert. SHAP Drivers & Rule Triggers.',
+      headline: 'Explain Risk & Generate Early Warnings',
       description:
-        'Decomposes predictive scores into clear mathematical factor attributions with Shapley values, while deterministic rules surface immediate early warning flags on abnormal burn gaps.',
+        'The system identifies the strongest model-supported signals and generates early-warning flags from defined rules.',
       bullets: [
         'Shapley value decomposition for local factor ranking',
-        'Surfaces top 3 positive & negative risk contributors',
+        'Surfaces top positive & negative risk contributors',
         'Deterministic early warning triggers on burn gaps',
         'Multi-tier ministerial alert routing & urgency badges',
       ],
@@ -96,14 +96,14 @@ export default function HomePage() {
       icon: Bot,
       accentColor: 'from-violet-600 to-fuchsia-600',
       badgeColor: 'border-violet-200 bg-violet-50 text-violet-800',
-      headline: 'Decide & Act. Grounded AI & Executive Insights.',
+      headline: 'Support Decisions with Grounded AI',
       description:
-        'Interactive AI assistant grounded directly in live portfolio telemetry, accompanied by state-wise vector map dossiers, multi-project comparisons, and automated interventions.',
+        'The dashboard and AI assistant help users understand the evidence and identify areas that may need review.',
       bullets: [
         'Grounded PRAGATI AI assistant for instant natural Q&A',
         'State-wise interactive choropleth map & ministry dossiers',
         'Side-by-side asset comparison benchmarks & burn charts',
-        'Actionable intervention playbooks for project directors',
+        'Context-grounded decision support for monitoring officials',
       ],
       ctaText: 'Launch PRAGATI AI Assistant',
       ctaHref: '/dashboard/assistant',
@@ -112,10 +112,10 @@ export default function HomePage() {
 
   const demoSteps = [
     {
-      title: '1. Ingest PAIMANA & OCMS Project Telemetry',
+      title: '1. Ingest & Standardize Project Data',
       badge: 'Data Layer',
       description:
-        'Continuous ingestion of monthly project snapshots across 850 infrastructure assets, capturing cumulative expenditure, physical progress, and milestone schedules.',
+        'Collect, validate, and standardize monthly project snapshots across 850 infrastructure assets, capturing cumulative expenditure, physical progress, and milestone schedules.',
       link: '/dashboard/projects',
       linkText: 'Explore Monitored Assets',
     },
@@ -382,10 +382,10 @@ export default function HomePage() {
                 <span>HOW IT WORKS &bull; END-TO-END PIPELINE</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                From Raw Telemetry to Executive Action
+                From Project Monitoring Data to Actionable Insights
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mt-1 leading-relaxed">
-                A horizontal 4-stage pipeline combining automated ingestion, calibrated ML inference, local SHAP attribution, and grounded decision support.
+                A structured 4-stage workflow combining data standardization, calibrated ML inference, factor attribution, and grounded decision support.
               </p>
             </div>
 
