@@ -19,4 +19,4 @@ uvicorn>=0.30.0
 pydantic>=2.7.0
 
 # Model Explainability & Interpretability
-shap>=0.52.0
+shap>=0.45.0
