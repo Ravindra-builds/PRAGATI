@@ -478,11 +478,12 @@ export class ProjectService {
     const offset = Math.max(Number(filters.offset) || 0, 0)
 
     try {
-      const totalActiveWarningsInDb = await prisma.earlyWarning.count({
-        where: { resolvedAt: null },
-      })
+      const [totalProjectsInDb, totalActiveWarningsInDb] = await Promise.all([
+        prisma.project.count(),
+        prisma.earlyWarning.count({ where: { resolvedAt: null } }),
+      ])
 
-      if (totalActiveWarningsInDb < 100) {
+      if (totalProjectsInDb < 850 || totalActiveWarningsInDb < 100) {
         return syntheticDatasetService.getAlerts(filters)
       }
 

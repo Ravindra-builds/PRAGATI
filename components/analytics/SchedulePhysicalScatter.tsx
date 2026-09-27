@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Clock, AlertTriangle, HelpCircle } from 'lucide-react'
 import { ProgressScatterPoint } from '@/lib/services/synthetic-dataset'
@@ -11,6 +11,8 @@ interface SchedulePhysicalScatterProps {
 
 export function SchedulePhysicalScatter({ points }: SchedulePhysicalScatterProps) {
   const [hoveredPoint, setHoveredPoint] = useState<ProgressScatterPoint | null>(null)
+  const [pinnedPoint, setPinnedPoint] = useState<ProgressScatterPoint | null>(null)
+  const [tierFilter, setTierFilter] = useState<'ALL' | 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL')
 
   // Dimensions
   const width = 640
@@ -33,13 +35,86 @@ export function SchedulePhysicalScatter({ points }: SchedulePhysicalScatterProps
   const getPointVisuals = (risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL') => {
     switch (risk) {
       case 'CRITICAL':
-        return { color: '#e11d48', opacity: 0.95, radius: 5.5 }
+        return { color: '#e11d48', opacity: 0.95, radius: 5.2 }
       case 'HIGH':
-        return { color: '#f59e0b', opacity: 0.85, radius: 4.5 }
+        return { color: '#f59e0b', opacity: 0.9, radius: 4.6 }
       case 'MEDIUM':
-        return { color: '#eab308', opacity: 0.60, radius: 3.5 }
+        return { color: '#eab308', opacity: 0.8, radius: 4.0 }
       case 'LOW':
-        return { color: '#10b981', opacity: 0.35, radius: 2.8 }
+        return { color: '#10b981', opacity: 0.7, radius: 3.6 }
+    }
+  }
+
+  // Stratified visual sampling with minimum pixel distance so points have clear breathing room
+  const displayedPoints = useMemo(() => {
+    const filtered =
+      tierFilter === 'ALL' ? points : points.filter((p) => p.overallRiskLevel === tierFilter)
+
+    const rank: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 }
+    const sorted = [...filtered].sort(
+      (a, b) => (rank[b.overallRiskLevel] || 0) - (rank[a.overallRiskLevel] || 0)
+    )
+
+    const minPxDist = tierFilter === 'ALL' ? 12.5 : 9.5
+    const minPxDistSq = minPxDist * minPxDist
+    const accepted: { p: ProgressScatterPoint; cx: number; cy: number }[] = []
+
+    for (const p of sorted) {
+      const cx =
+        padding.left + (Math.max(0, Math.min(100, p.scheduleCompletionPct)) / 100) * chartWidth
+      const cy =
+        padding.top +
+        chartHeight -
+        (Math.max(0, Math.min(100, p.physicalProgressPct)) / 100) * chartHeight
+
+      let tooClose = false
+      for (const item of accepted) {
+        const dx = cx - item.cx
+        const dy = cy - item.cy
+        if (dx * dx + dy * dy < minPxDistSq) {
+          tooClose = true
+          break
+        }
+      }
+      if (!tooClose) {
+        accepted.push({ p, cx, cy })
+      }
+    }
+
+    // Draw LOW -> MEDIUM -> HIGH -> CRITICAL so critical points render on top
+    return accepted
+      .reverse()
+      .map((item) => item.p)
+  }, [points, tierFilter, chartWidth, chartHeight, padding.left, padding.top])
+
+  const activePoint = pinnedPoint || hoveredPoint || displayedPoints[displayedPoints.length - 1] || null
+
+  // Magnetic nearest-point lookup on mouse move across the SVG
+  const handleSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (displayedPoints.length === 0) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+
+    const svgX = ((e.clientX - rect.left) / rect.width) * width
+    const svgY = ((e.clientY - rect.top) / rect.height) * height
+
+    let nearest: ProgressScatterPoint | null = null
+    let minDistSq = 28 * 28 // generous 28px magnetic capture radius
+
+    for (const p of displayedPoints) {
+      const cx = getX(p.scheduleCompletionPct)
+      const cy = getY(p.physicalProgressPct)
+      const dx = svgX - cx
+      const dy = svgY - cy
+      const dSq = dx * dx + dy * dy
+      if (dSq <= minDistSq) {
+        minDistSq = dSq
+        nearest = p
+      }
+    }
+
+    if (nearest) {
+      setHoveredPoint(nearest)
     }
   }
 
@@ -50,18 +125,20 @@ export function SchedulePhysicalScatter({ points }: SchedulePhysicalScatterProps
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-amber-50 text-amber-700">
-            <Clock className="w-4 h-4" />
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-700">
+              <Clock className="w-4 h-4" />
+            </div>
+            <h2 className="text-base font-bold text-slate-900 tracking-tight">
+              Are projects falling behind their planned schedule?
+            </h2>
           </div>
-          <h2 className="text-base font-bold text-slate-900 tracking-tight">
-            Are projects falling behind their planned schedule?
-          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Projects where time consumed is ahead of physical progress may need closer review.
+          </p>
         </div>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Projects where time consumed is ahead of physical progress may need closer review.
-        </p>
       </div>
 
       {/* Insight Card */}
@@ -79,21 +156,48 @@ export function SchedulePhysicalScatter({ points }: SchedulePhysicalScatterProps
         </div>
       </div>
 
-      {/* Reading Helper */}
-      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 px-1">
-        <HelpCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        <span>
-          <strong>How to read this:</strong> Points below the diagonal line indicate planned time is being consumed faster than physical work is being completed.
-        </span>
+      {/* Reading Helper & Tier Filter Pills */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 px-1">
+        <div className="flex items-center gap-1.5">
+          <HelpCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span>
+            <strong>Hover near any point</strong> to inspect, or <strong>click</strong> to pin it.
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          {(['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const).map((tier) => (
+            <button
+              key={tier}
+              type="button"
+              onClick={() => {
+                setTierFilter(tier)
+                setPinnedPoint(null)
+              }}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                tierFilter === tier
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {tier === 'ALL' ? 'All Tiers' : tier.charAt(0) + tier.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Scatter Plot */}
       <div className="relative w-full bg-slate-50/50 rounded-xl border border-slate-200 p-2 sm:p-3">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto select-none"
+          className="w-full h-auto select-none cursor-crosshair"
           role="img"
           aria-label="Scatter plot showing elapsed schedule versus physical progress"
+          onMouseMove={handleSvgMouseMove}
+          onClick={() => {
+            if (hoveredPoint) {
+              setPinnedPoint((prev) => (prev?.projectId === hoveredPoint.projectId ? null : hoveredPoint))
+            }
+          }}
         >
           {/* Schedule slippage danger polygon (below diagonal: x > y) */}
           <polygon
@@ -166,12 +270,36 @@ export function SchedulePhysicalScatter({ points }: SchedulePhysicalScatterProps
 
           {/* Zone labels */}
           <text
-            x={getX(50)}
-            y={getY(15)}
-            className="text-[10px] fill-amber-700 font-semibold uppercase tracking-wider opacity-75"
+            x={getX(46)}
+            y={getY(10)}
+            className="text-[10px] fill-amber-700 font-semibold uppercase tracking-wider opacity-80"
           >
             &darr; Time consumed ahead of progress
           </text>
+
+          {/* Active Point Crosshair */}
+          {activePoint && (
+            <g className="pointer-events-none">
+              <line
+                x1={getX(activePoint.scheduleCompletionPct)}
+                y1={padding.top}
+                x2={getX(activePoint.scheduleCompletionPct)}
+                y2={padding.top + chartHeight}
+                stroke="#94a3b8"
+                strokeWidth="1"
+                strokeDasharray="3 3"
+              />
+              <line
+                x1={padding.left}
+                y1={getY(activePoint.physicalProgressPct)}
+                x2={padding.left + chartWidth}
+                y2={getY(activePoint.physicalProgressPct)}
+                stroke="#94a3b8"
+                strokeWidth="1"
+                strokeDasharray="3 3"
+              />
+            </g>
+          )}
 
           {/* Axis Labels */}
           <text
@@ -193,86 +321,116 @@ export function SchedulePhysicalScatter({ points }: SchedulePhysicalScatterProps
           </text>
 
           {/* Points */}
-          {points.map((p) => {
+          {displayedPoints.map((p) => {
             const cx = getX(p.scheduleCompletionPct)
             const cy = getY(p.physicalProgressPct)
-            const isHovered = hoveredPoint?.projectId === p.projectId
+            const isSelected = activePoint?.projectId === p.projectId
             const visual = getPointVisuals(p.overallRiskLevel)
 
             return (
-              <circle
+              <g
                 key={p.projectId}
-                cx={cx}
-                cy={cy}
-                r={isHovered ? 7.5 : visual.radius}
-                fill={visual.color}
-                fillOpacity={isHovered ? 1 : visual.opacity}
-                stroke={isHovered ? '#0f172a' : p.overallRiskLevel === 'CRITICAL' ? '#ffffff' : 'none'}
-                strokeWidth={isHovered ? 2 : 1}
-                className="cursor-pointer transition-all duration-100"
+                className="cursor-pointer"
                 onMouseEnter={() => setHoveredPoint(p)}
-                onMouseLeave={() => setHoveredPoint(null)}
-              />
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPinnedPoint((prev) => (prev?.projectId === p.projectId ? null : p))
+                }}
+              >
+                {/* Generous invisible hit circle for easy hovering */}
+                <circle cx={cx} cy={cy} r={11} fill="transparent" />
+                {isSelected && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={9.5}
+                    fill="none"
+                    stroke="#0f172a"
+                    strokeWidth="1.5"
+                    opacity="0.4"
+                  />
+                )}
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={isSelected ? 6.5 : visual.radius}
+                  fill={visual.color}
+                  fillOpacity={isSelected ? 1 : visual.opacity}
+                  stroke={isSelected ? '#0f172a' : '#ffffff'}
+                  strokeWidth={isSelected ? 2 : 1}
+                />
+              </g>
             )
           })}
         </svg>
+      </div>
 
-        {/* Floating Tooltip Card */}
-        {hoveredPoint && (
-          <div className="absolute top-4 right-4 bg-slate-900/95 text-white p-3 rounded-lg shadow-lg border border-slate-700 text-xs w-64 backdrop-blur-xs z-10 space-y-1.5">
-            <div className="flex items-center justify-between border-b border-slate-700 pb-1">
-              <span className="font-bold text-slate-100 truncate pr-2">
-                {hoveredPoint.name}
+      {/* Persistent Active Project Inspector Bar (Never blocks cursor or disappears when moving to click link) */}
+      {activePoint && (
+        <div className="bg-slate-900 text-white p-3.5 rounded-xl border border-slate-800 text-xs space-y-2.5 shadow-xs">
+          {/* Top Row: Badges + View Project Button */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-800 text-blue-300 border border-slate-700 whitespace-nowrap">
+                {activePoint.projectId}
               </span>
-              <span className="font-mono text-[10px] text-slate-400 shrink-0">
-                {hoveredPoint.projectId}
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-300">
-              {hoveredPoint.sector} &bull; {hoveredPoint.state}
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px] font-mono">
-              <div>
-                <span className="text-slate-400 block text-[10px]">Schedule Elapsed:</span>
-                <span className="font-bold text-blue-400">{hoveredPoint.scheduleCompletionPct}%</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-[10px]">Physical Done:</span>
-                <span className="font-bold text-emerald-400">{hoveredPoint.physicalProgressPct}%</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-[10px]">Schedule Lag:</span>
-                <span className={`font-bold ${hoveredPoint.scheduleProgressGap > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
-                  {hoveredPoint.scheduleProgressGap > 0 ? `+${hoveredPoint.scheduleProgressGap}%` : `${hoveredPoint.scheduleProgressGap}%`}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-[10px]">Delay Likelihood:</span>
-                <span className="font-bold text-rose-400">
-                  {(hoveredPoint.timeOverrunProbability * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-            <div className="pt-2 flex items-center justify-between border-t border-slate-800 text-[10px]">
               <span
-                className="px-1.5 py-0.5 rounded font-bold uppercase"
+                className="px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap"
                 style={{
-                  backgroundColor: `${getPointVisuals(hoveredPoint.overallRiskLevel).color}33`,
-                  color: getPointVisuals(hoveredPoint.overallRiskLevel).color,
+                  backgroundColor: `${getPointVisuals(activePoint.overallRiskLevel).color}33`,
+                  color: getPointVisuals(activePoint.overallRiskLevel).color,
                 }}
               >
-                {hoveredPoint.overallRiskLevel} Risk
+                {activePoint.overallRiskLevel} Risk
               </span>
-              <Link
-                href={`/dashboard/projects/${hoveredPoint.projectId}`}
-                className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-semibold underline"
-              >
-                <span>View Project &rarr;</span>
-              </Link>
+              {pinnedPoint?.projectId === activePoint.projectId && (
+                <button
+                  type="button"
+                  onClick={() => setPinnedPoint(null)}
+                  className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold whitespace-nowrap cursor-pointer hover:bg-amber-500/30 transition-colors"
+                >
+                  Pinned &times;
+                </button>
+              )}
+            </div>
+
+            <Link
+              href={`/dashboard/projects/${activePoint.projectId}`}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-sans font-semibold text-xs transition-colors whitespace-nowrap shrink-0"
+            >
+              View Project &rarr;
+            </Link>
+          </div>
+
+          {/* Middle: Full-width Project Title & Location */}
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-100 truncate">
+              {activePoint.name}
+            </div>
+            <div className="text-[11px] text-slate-400 truncate mt-0.5">
+              {activePoint.sector} &bull; {activePoint.state}
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Bottom Row: 3-Column Metrics Strip */}
+          <div className="grid grid-cols-3 gap-3 font-mono text-[11px] border-t border-slate-800 pt-2">
+            <div>
+              <span className="text-slate-400 block text-[10px] font-sans">Schedule Elapsed</span>
+              <span className="font-bold text-blue-400">{activePoint.scheduleCompletionPct}%</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[10px] font-sans">Physical Done</span>
+              <span className="font-bold text-emerald-400">{activePoint.physicalProgressPct}%</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[10px] font-sans">Schedule Lag</span>
+              <span className={`font-bold ${activePoint.scheduleProgressGap > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+                {activePoint.scheduleProgressGap > 0 ? `+${activePoint.scheduleProgressGap}%` : `${activePoint.scheduleProgressGap}%`}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1 border-t border-slate-100 text-slate-600">
@@ -291,7 +449,7 @@ export function SchedulePhysicalScatter({ points }: SchedulePhysicalScatterProps
             <span className="text-slate-500">Medium</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 opacity-60" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 opacity-75" />
             <span className="text-slate-500">Low</span>
           </div>
         </div>

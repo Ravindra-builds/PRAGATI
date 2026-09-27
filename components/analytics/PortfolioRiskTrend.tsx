@@ -66,6 +66,12 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
   const physicalPath = makePath('avgPhysicalProgressPct')
   const financialPath = makePath('avgFinancialProgressPct')
 
+  const firstX = getX(0).toFixed(1)
+  const lastX = getX(n - 1).toFixed(1)
+  const bottomY = getY(0).toFixed(1)
+  const financialAreaPath = `${financialPath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`
+  const physicalAreaPath = `${physicalPath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`
+
   const activePoint = hoveredIndex !== null ? sortedTrend[hoveredIndex] : null
 
   const latestSnapshot = sortedTrend[sortedTrend.length - 1]
@@ -108,7 +114,7 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
       {latestSnapshot && (
         <div className="bg-blue-50/70 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 flex items-center justify-between">
           <span>
-            In the latest reporting period ({latestSnapshot.snapshotMonth}), financial utilization is{' '}
+            In the latest reporting period ({formatMonthLabel(latestSnapshot.snapshotMonth)}), financial utilization is{' '}
             <strong>{Math.abs(diff)} percentage points {diff >= 0 ? 'ahead of' : 'behind'}</strong> physical delivery across the portfolio.
           </span>
         </div>
@@ -122,6 +128,17 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
           role="img"
           aria-label="Temporal progress chart across snapshot months"
         >
+          <defs>
+            <linearGradient id="finAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="#2563eb" stopOpacity="0.01" />
+            </linearGradient>
+            <linearGradient id="phyAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
           {/* Grid lines */}
           {[0, 25, 50, 75, 100].map((val) => (
             <g key={val}>
@@ -145,6 +162,10 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
             </g>
           ))}
 
+          {/* Shaded Areas */}
+          <path d={financialAreaPath} fill="url(#finAreaGrad)" />
+          <path d={physicalAreaPath} fill="url(#phyAreaGrad)" />
+
           {/* Paths */}
           <path
             d={physicalPath}
@@ -163,13 +184,14 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
             strokeLinejoin="round"
           />
 
-          {/* Data Points */}
+          {/* Data Points & Full-Height Column Hit Zones */}
           {sortedTrend.map((d, i) => {
             const x = getX(i)
             const yPhy = getY(d.avgPhysicalProgressPct)
             const yFin = getY(d.avgFinancialProgressPct)
             const isHovered = hoveredIndex === i
             const showTick = i === 0 || i === n - 1 || (i % 3 === 0 && n - 1 - i >= 2)
+            const colWidth = n > 1 ? chartWidth / (n - 1) : chartWidth
 
             return (
               <g
@@ -178,6 +200,15 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
+                {/* Invisible full-column hit target for effortless hover */}
+                <rect
+                  x={x - colWidth / 2}
+                  y={padding.top}
+                  width={colWidth}
+                  height={chartHeight}
+                  fill="transparent"
+                />
+
                 {/* Vertical hover guide */}
                 {isHovered && (
                   <line
@@ -185,7 +216,7 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
                     y1={padding.top}
                     x2={x}
                     y2={padding.top + chartHeight}
-                    stroke="#cbd5e1"
+                    stroke="#94a3b8"
                     strokeWidth="1.5"
                     strokeDasharray="3 3"
                   />
@@ -195,7 +226,7 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
                 <circle
                   cx={x}
                   cy={yFin}
-                  r={isHovered ? 5 : 3.5}
+                  r={isHovered ? 5.5 : 3.5}
                   fill="#2563eb"
                   stroke="#ffffff"
                   strokeWidth="1.5"
@@ -205,7 +236,7 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
                 <circle
                   cx={x}
                   cy={yPhy}
-                  r={isHovered ? 5 : 3.5}
+                  r={isHovered ? 5.5 : 3.5}
                   fill="#10b981"
                   stroke="#ffffff"
                   strokeWidth="1.5"
@@ -227,10 +258,10 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
           })}
         </svg>
 
-        {/* Hover Snapshot Tooltip */}
+        {/* Hover Snapshot Tooltip (pointer-events-none so it never blocks cursor) */}
         {activePoint && (
-          <div className="absolute top-4 right-4 bg-slate-900/95 text-white px-3 py-2 rounded-lg shadow-md border border-slate-700 text-xs font-mono backdrop-blur-xs flex items-center gap-3">
-            <span className="font-bold text-slate-200">{formatMonthLabel(activePoint.snapshotMonth)} ({activePoint.snapshotMonth})</span>
+          <div className="pointer-events-none absolute top-4 left-16 bg-slate-900/95 text-white px-3 py-2 rounded-lg shadow-md border border-slate-700 text-xs font-mono backdrop-blur-xs flex items-center gap-3">
+            <span className="font-bold text-slate-200">{formatMonthLabel(activePoint.snapshotMonth)}</span>
             <span>&bull;</span>
             <span className="text-emerald-400">Delivery: {activePoint.avgPhysicalProgressPct}%</span>
             <span>&bull;</span>

@@ -19,6 +19,13 @@ export function SectorRiskChart({
 }: SectorRiskChartProps) {
   const [sortField, setSortField] = useState<SortField>('criticalAndHigh')
   const [sortAsc, setSortAsc] = useState(false)
+  const [hoveredSeg, setHoveredSeg] = useState<{
+    sector: string
+    tier: string
+    count: number
+    pct: number
+    color: string
+  } | null>(null)
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -64,7 +71,7 @@ export function SectorRiskChart({
               Risk by Infrastructure Sector
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              See where high-risk projects are concentrated.
+              Hover any bar segment for instant risk breakdown, or click a sector to filter.
             </p>
           </div>
         </div>
@@ -87,6 +94,14 @@ export function SectorRiskChart({
           const highPct = (sec.high / sec.totalProjects) * 100
           const mediumPct = (sec.medium / sec.totalProjects) * 100
           const lowPct = (sec.low / sec.totalProjects) * 100
+          const activeForSector = hoveredSeg?.sector === sec.sector ? hoveredSeg : null
+
+          const segments = [
+            { tier: 'Critical Risk', count: sec.critical, pct: criticalPct, bg: 'bg-rose-600', hex: '#e11d48' },
+            { tier: 'High Risk', count: sec.high, pct: highPct, bg: 'bg-amber-500', hex: '#f59e0b' },
+            { tier: 'Medium Risk', count: sec.medium, pct: mediumPct, bg: 'bg-yellow-400', hex: '#eab308' },
+            { tier: 'Low Risk', count: sec.low, pct: lowPct, bg: 'bg-emerald-500', hex: '#10b981' },
+          ]
 
           return (
             <div
@@ -98,52 +113,63 @@ export function SectorRiskChart({
                   : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50/70'
               }`}
             >
-              <div className="flex items-center justify-between text-xs mb-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-1.5">
                 <div className="flex items-center gap-2 font-semibold text-slate-800">
                   <span>{sec.sector}</span>
                   <span className="text-[11px] font-mono text-slate-400 font-normal">
                     ({sec.totalProjects} projects &bull; ₹{sec.totalSanctionedCostCr.toLocaleString('en-IN', { maximumFractionDigits: 0 })} Cr)
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] font-mono">
-                  <span className="text-rose-700 font-semibold">{sec.critical} Crit</span>
-                  <span className="text-amber-700 font-semibold">{sec.high} High</span>
-                  <span className="text-slate-400">|</span>
-                  <span className="text-slate-600">Cost: {(sec.avgCostRisk * 100).toFixed(0)}%</span>
-                  <span className="text-slate-600">Delay: {(sec.avgTimeRisk * 100).toFixed(0)}%</span>
-                </div>
+                {activeForSector ? (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 text-white text-[11px] font-mono shadow-2xs">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: activeForSector.color }}
+                    />
+                    <span className="font-sans font-semibold">{activeForSector.tier}:</span>
+                    <span className="font-bold">{activeForSector.count} projects</span>
+                    <span className="text-slate-300">({activeForSector.pct.toFixed(1)}%)</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-[11px] font-mono">
+                    <span className="text-rose-700 font-semibold">{sec.critical} Crit</span>
+                    <span className="text-amber-700 font-semibold">{sec.high} High</span>
+                    <span className="text-slate-400">|</span>
+                    <span className="text-slate-600">Cost: {(sec.avgCostRisk * 100).toFixed(0)}%</span>
+                    <span className="text-slate-600">Delay: {(sec.avgTimeRisk * 100).toFixed(0)}%</span>
+                  </div>
+                )}
               </div>
 
-              {/* Segmented bar */}
-              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden flex">
-                {sec.critical > 0 && (
-                  <div
-                    style={{ width: `${criticalPct}%` }}
-                    className="bg-rose-600 h-full"
-                    title={`Critical: ${sec.critical} (${criticalPct.toFixed(0)}%)`}
-                  />
-                )}
-                {sec.high > 0 && (
-                  <div
-                    style={{ width: `${highPct}%` }}
-                    className="bg-amber-500 h-full"
-                    title={`High: ${sec.high} (${highPct.toFixed(0)}%)`}
-                  />
-                )}
-                {sec.medium > 0 && (
-                  <div
-                    style={{ width: `${mediumPct}%` }}
-                    className="bg-yellow-400 h-full"
-                    title={`Medium: ${sec.medium} (${mediumPct.toFixed(0)}%)`}
-                  />
-                )}
-                {sec.low > 0 && (
-                  <div
-                    style={{ width: `${lowPct}%` }}
-                    className="bg-emerald-500 h-full"
-                    title={`Low: ${sec.low} (${lowPct.toFixed(0)}%)`}
-                  />
-                )}
+              {/* Segmented bar with instant 0ms hover */}
+              <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden flex">
+                {segments.map((seg) => {
+                  if (seg.count <= 0) return null
+                  const isSegHovered =
+                    activeForSector && activeForSector.tier === seg.tier
+                  const isSegDimmed = activeForSector && !isSegHovered
+                  return (
+                    <div
+                      key={seg.tier}
+                      style={{ width: `${seg.pct}%` }}
+                      onMouseEnter={() =>
+                        setHoveredSeg({
+                          sector: sec.sector,
+                          tier: seg.tier,
+                          count: seg.count,
+                          pct: seg.pct,
+                          color: seg.hex,
+                        })
+                      }
+                      onMouseLeave={() => setHoveredSeg(null)}
+                      className={`${seg.bg} h-full transition-all duration-100 flex items-center justify-center text-[9px] font-mono font-bold text-white ${
+                        isSegHovered ? 'brightness-110' : isSegDimmed ? 'opacity-60' : ''
+                      }`}
+                    >
+                      {seg.pct >= 10 ? `${Math.round(seg.pct)}%` : ''}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )

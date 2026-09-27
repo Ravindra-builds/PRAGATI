@@ -19,6 +19,7 @@ import { StatCard } from '@/components/ui/StatCard'
 import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { InteractivePieChart } from '@/components/ui/InteractivePieChart'
 
 interface DashboardSummaryData {
   totalProjects: number
@@ -84,6 +85,7 @@ export default function DashboardPage() {
   const [selectedSector, setSelectedSector] = useState('ALL')
   const [selectedMinistry, setSelectedMinistry] = useState('ALL')
   const [selectedState, setSelectedState] = useState('ALL')
+  const [hoveredRiskTier, setHoveredRiskTier] = useState<string | null>(null)
 
   const fetchSummary = useCallback(async () => {
     setLoading(true)
@@ -325,94 +327,181 @@ export default function DashboardPage() {
           </div>
 
           {data ? (
-            <div className="space-y-4 pt-1">
-              {/* Distribution Stacked Bar */}
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
-                <div
-                  style={{
-                    width: `${data.totalProjects ? (data.riskDistribution.CRITICAL / data.totalProjects) * 100 : 0}%`,
-                  }}
-                  className="bg-rose-500 h-full transition-all duration-500"
-                  title={`Critical: ${data.riskDistribution.CRITICAL}`}
-                />
-                <div
-                  style={{
-                    width: `${data.totalProjects ? (data.riskDistribution.HIGH / data.totalProjects) * 100 : 0}%`,
-                  }}
-                  className="bg-orange-400 h-full transition-all duration-500"
-                  title={`High: ${data.riskDistribution.HIGH}`}
-                />
-                <div
-                  style={{
-                    width: `${data.totalProjects ? (data.riskDistribution.MEDIUM / data.totalProjects) * 100 : 0}%`,
-                  }}
-                  className="bg-amber-300 h-full transition-all duration-500"
-                  title={`Medium: ${data.riskDistribution.MEDIUM}`}
-                />
-                <div
-                  style={{
-                    width: `${data.totalProjects ? (data.riskDistribution.LOW / data.totalProjects) * 100 : 0}%`,
-                  }}
-                  className="bg-emerald-500 h-full transition-all duration-500"
-                  title={`Low: ${data.riskDistribution.LOW}`}
-                />
-              </div>
+            (() => {
+              const total = data.totalProjects || 1
+              const pieSlices = [
+                {
+                  key: 'LOW',
+                  label: 'Low Risk',
+                  shortLabel: 'Low',
+                  count: data.riskDistribution.LOW,
+                  pct: (data.riskDistribution.LOW / total) * 100,
+                  color: '#10b981',
+                  darkColor: '#047857',
+                  barClass: 'bg-emerald-500',
+                  cardBg: 'bg-emerald-50/60 border-emerald-100',
+                  cardActive: 'ring-2 ring-emerald-500 bg-emerald-100/70 border-emerald-300 shadow-xs -translate-y-0.5',
+                  dotClass: 'bg-emerald-500',
+                  titleColor: 'text-emerald-800',
+                  numColor: 'text-emerald-950',
+                  subColor: 'text-emerald-600',
+                  desc: 'Progress pace aligns with budget utilization',
+                },
+                {
+                  key: 'MEDIUM',
+                  label: 'Medium Risk',
+                  shortLabel: 'Medium',
+                  count: data.riskDistribution.MEDIUM,
+                  pct: (data.riskDistribution.MEDIUM / total) * 100,
+                  color: '#eab308',
+                  darkColor: '#a16207',
+                  barClass: 'bg-amber-400',
+                  cardBg: 'bg-amber-50/60 border-amber-100',
+                  cardActive: 'ring-2 ring-amber-500 bg-amber-100/70 border-amber-300 shadow-xs -translate-y-0.5',
+                  dotClass: 'bg-amber-400',
+                  titleColor: 'text-amber-800',
+                  numColor: 'text-amber-950',
+                  subColor: 'text-amber-600',
+                  desc: 'Early divergence between spending pace and progress',
+                },
+                {
+                  key: 'HIGH',
+                  label: 'High Risk',
+                  shortLabel: 'High',
+                  count: data.riskDistribution.HIGH,
+                  pct: (data.riskDistribution.HIGH / total) * 100,
+                  color: '#f97316',
+                  darkColor: '#c2410c',
+                  barClass: 'bg-orange-500',
+                  cardBg: 'bg-orange-50/60 border-orange-100',
+                  cardActive: 'ring-2 ring-orange-500 bg-orange-100/70 border-orange-300 shadow-xs -translate-y-0.5',
+                  dotClass: 'bg-orange-500',
+                  titleColor: 'text-orange-800',
+                  numColor: 'text-orange-950',
+                  subColor: 'text-orange-600',
+                  desc: 'Significant expenditure burn gap or milestone slippage',
+                },
+                {
+                  key: 'CRITICAL',
+                  label: 'Critical Risk',
+                  shortLabel: 'Critical',
+                  count: data.riskDistribution.CRITICAL,
+                  pct: (data.riskDistribution.CRITICAL / total) * 100,
+                  color: '#f43f5e',
+                  darkColor: '#be123c',
+                  barClass: 'bg-rose-500',
+                  cardBg: 'bg-rose-50/60 border-rose-100',
+                  cardActive: 'ring-2 ring-rose-500 bg-rose-100/70 border-rose-300 shadow-xs -translate-y-0.5',
+                  dotClass: 'bg-rose-500',
+                  titleColor: 'text-rose-800',
+                  numColor: 'text-rose-950',
+                  subColor: 'text-rose-600',
+                  desc: 'Severe dual cost and schedule overrun exposure',
+                },
+              ]
 
-              {/* Legend Grid: Critical -> High -> Medium -> Low */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                <div className="p-3 rounded-lg bg-rose-50/60 border border-rose-100">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-800">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                    <span>Critical</span>
-                  </div>
-                  <div className="mt-1 text-xl font-bold text-rose-950 font-mono">
-                    {data.riskDistribution.CRITICAL}
-                  </div>
-                  <div className="text-[11px] text-rose-600">
-                    {data.totalProjects ? ((data.riskDistribution.CRITICAL / data.totalProjects) * 100).toFixed(1) : 0}% of portfolio
+              // Ordered Critical -> High -> Medium -> Low for bar & cards
+              const orderedTiers = [...pieSlices].reverse()
+              const activeTierObj = orderedTiers.find((t) => t.key === hoveredRiskTier) || null
+
+              return (
+                <div className="flex flex-col md:flex-row items-center gap-6 pt-1">
+                  {/* 3D Solid Wedge Pie Chart with Inline Percentages & Instant Hover */}
+                  <InteractivePieChart
+                    slices={pieSlices}
+                    total={data.totalProjects}
+                    hoveredKey={hoveredRiskTier}
+                    onHoverKey={setHoveredRiskTier}
+                  />
+
+                  {/* Stacked Bar + Instant Callout + 4 Tier Cards */}
+                  <div className="flex-1 w-full space-y-4">
+                    {/* Distribution Stacked Bar with Instant 0ms Hover */}
+                    <div className="space-y-1.5">
+                      <div className="w-full h-5 bg-slate-100 rounded-lg overflow-hidden flex border border-slate-200/80">
+                        {orderedTiers.map((t) => {
+                          if (t.pct <= 0) return null
+                          const isHovered = hoveredRiskTier === t.key
+                          const isDimmed = hoveredRiskTier !== null && !isHovered
+                          return (
+                            <div
+                              key={t.key}
+                              style={{ width: `${t.pct}%` }}
+                              onMouseEnter={() => setHoveredRiskTier(t.key)}
+                              onMouseLeave={() => setHoveredRiskTier(null)}
+                              className={`${t.barClass} h-full transition-all duration-150 cursor-pointer flex items-center justify-center text-[10px] font-mono font-bold text-white ${
+                                isHovered ? 'brightness-110 scale-y-105' : isDimmed ? 'opacity-65' : ''
+                              }`}
+                            >
+                              {t.pct >= 8 ? `${Math.round(t.pct)}%` : ''}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Instant Zero-Delay Communication Bar Below Stacked Bar */}
+                      <div className="min-h-6 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200/80 flex items-center justify-between text-[11px] transition-all duration-75">
+                        {activeTierObj ? (
+                          <>
+                            <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: activeTierObj.color }}
+                              />
+                              <span>{activeTierObj.label}:</span>
+                              <span className="font-normal text-slate-600 truncate">
+                                {activeTierObj.desc}
+                              </span>
+                            </div>
+                            <span className="font-mono font-bold text-slate-900 shrink-0 ml-2">
+                              {activeTierObj.count} projects ({activeTierObj.pct.toFixed(1)}%)
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-slate-500">
+                            Hover any pie wedge, bar segment, or card for instant breakdown details.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Legend Grid: Critical -> High -> Medium -> Low */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {orderedTiers.map((t) => {
+                        const isHovered = hoveredRiskTier === t.key
+                        return (
+                          <Link
+                            key={t.key}
+                            href={`/dashboard/projects?risk=${t.key}`}
+                            onMouseEnter={() => setHoveredRiskTier(t.key)}
+                            onMouseLeave={() => setHoveredRiskTier(null)}
+                            className={`p-3 rounded-lg border transition-all duration-150 block ${
+                              isHovered ? t.cardActive : t.cardBg
+                            }`}
+                          >
+                            <div className={`flex items-center justify-between text-xs font-semibold ${t.titleColor}`}>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${t.dotClass} shrink-0`} />
+                                <span>{t.shortLabel}</span>
+                              </div>
+                              <span className="font-mono text-[10px] opacity-80">
+                                {Math.round(t.pct)}%
+                              </span>
+                            </div>
+                            <div className={`mt-1 text-xl font-bold ${t.numColor} font-mono`}>
+                              {t.count}
+                            </div>
+                            <div className={`text-[11px] ${t.subColor}`}>
+                              {t.pct.toFixed(1)}% of portfolio
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-lg bg-orange-50/60 border border-orange-100">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-orange-800">
-                    <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
-                    <span>High</span>
-                  </div>
-                  <div className="mt-1 text-xl font-bold text-orange-950 font-mono">
-                    {data.riskDistribution.HIGH}
-                  </div>
-                  <div className="text-[11px] text-orange-600">
-                    {data.totalProjects ? ((data.riskDistribution.HIGH / data.totalProjects) * 100).toFixed(1) : 0}% of portfolio
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-100">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                    <span>Medium</span>
-                  </div>
-                  <div className="mt-1 text-xl font-bold text-amber-950 font-mono">
-                    {data.riskDistribution.MEDIUM}
-                  </div>
-                  <div className="text-[11px] text-amber-600">
-                    {data.totalProjects ? ((data.riskDistribution.MEDIUM / data.totalProjects) * 100).toFixed(1) : 0}% of portfolio
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-100">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                    <span>Low</span>
-                  </div>
-                  <div className="mt-1 text-xl font-bold text-emerald-950 font-mono">
-                    {data.riskDistribution.LOW}
-                  </div>
-                  <div className="text-[11px] text-emerald-600">
-                    {data.totalProjects ? ((data.riskDistribution.LOW / data.totalProjects) * 100).toFixed(1) : 0}% of portfolio
-                  </div>
-                </div>
-              </div>
-            </div>
+              )
+            })()
           ) : (
             <div className="h-36 flex items-center justify-center">
               <span className="text-xs text-slate-400">Loading risk breakdown...</span>
