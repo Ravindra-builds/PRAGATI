@@ -342,33 +342,40 @@ class SyntheticDatasetService {
       let costProb = 0.15
       let timeProb = 0.15
 
-      if (burnGap > 15 || latestUpdate.financialProgressPct > 70) {
-        costProb = Math.min(0.98, 0.45 + burnGap * 0.02)
+      if (burnGap > 15 || (burnGap > 10 && latestUpdate.financialProgressPct > 75)) {
+        costProb = Math.min(0.98, 0.48 + burnGap * 0.018)
       } else if (burnGap > 5) {
-        costProb = 0.42
+        costProb = 0.44
       }
 
-      if (milestoneRatio >= 0.4 || elapsedRatio > 0.8) {
-        timeProb = Math.min(0.96, 0.5 + milestoneRatio * 0.45)
+      if (milestoneRatio >= 0.35 || (elapsedRatio > 0.85 && latestUpdate.physicalProgressPct < 65)) {
+        timeProb = Math.min(0.96, 0.48 + milestoneRatio * 0.42)
       } else if (milestoneRatio >= 0.2) {
-        timeProb = 0.48
+        timeProb = 0.46
       }
 
-      // Check ground truth correlation if known in synthetic data
-      if (last.cost_overrun === '1') costProb = Math.max(costProb, 0.78)
-      if (last.time_overrun === '1') timeProb = Math.max(timeProb, 0.72)
+      // Align with synthetic ground-truth & operational status
+      if (last.project_status === 'Critical' && burnGap >= 18 && milestoneRatio >= 0.45) {
+        costProb = Math.max(costProb, 0.86)
+        timeProb = Math.max(timeProb, 0.84)
+      } else {
+        if (last.cost_overrun === '1') {
+          costProb = Math.max(costProb, burnGap >= 15 ? 0.78 : 0.64)
+        }
+        if (last.time_overrun === '1') {
+          timeProb = Math.max(timeProb, milestoneRatio >= 0.35 ? 0.78 : 0.62)
+        }
+      }
 
       const costPred = costProb >= 0.5 ? 1 : 0
       const timePred = timeProb >= 0.5 ? 1 : 0
 
       let overallRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW'
-      if (costProb >= 0.85 && timeProb >= 0.85) {
+      if (costProb >= 0.82 && timeProb >= 0.80) {
         overallRiskLevel = 'CRITICAL'
-      } else if (costPred === 1 && timePred === 1) {
+      } else if ((costPred === 1 && timePred === 1) || costProb >= 0.75 || timeProb >= 0.75) {
         overallRiskLevel = 'HIGH'
-      } else if (costProb >= 0.75 || timeProb >= 0.75) {
-        overallRiskLevel = 'HIGH'
-      } else if (costPred === 1 || timePred === 1 || costProb >= 0.4 || timeProb >= 0.4) {
+      } else if (costPred === 1 || timePred === 1 || costProb >= 0.40 || timeProb >= 0.40) {
         overallRiskLevel = 'MEDIUM'
       }
 

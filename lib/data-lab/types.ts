@@ -283,7 +283,7 @@ export interface DataLabPredictionResult {
   timeOverrunProbability: number
   timePrediction: number
   timeRiskLevel: 'HIGH' | 'LOW'
-  overallRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH'
+  overallRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
   costDrivers: Array<{
     feature: string
     displayName: string

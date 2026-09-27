@@ -179,9 +179,20 @@ def generate_synthetic_dataset(
         prev_fin = 0.0
         prev_del_milestones = 0
 
+        # Anchor latest observation strictly <= 2026-08 (current monitoring horizon)
+        max_elapsed_for_project = max(elapsed_points)
+        max_allowed_total_months = (2026 * 12) + (8 - 1)  # 2026-08
+        raw_start_total = (start_year * 12) + (start_month - 1)
+        if raw_start_total + max_elapsed_for_project > max_allowed_total_months:
+            excess_months = (raw_start_total + max_elapsed_for_project) - max_allowed_total_months
+            years_to_shift = (excess_months + 11) // 12
+            effective_start_year = start_year - years_to_shift
+        else:
+            effective_start_year = start_year
+
         for s_idx, elapsed_m in enumerate(elapsed_points):
             # Calculate snapshot calendar month accurately by adding integer months
-            total_months = (start_year * 12) + (start_month - 1) + elapsed_m
+            total_months = (effective_start_year * 12) + (start_month - 1) + elapsed_m
             snap_year = total_months // 12
             snap_mon = (total_months % 12) + 1
             snapshot_month = f"{snap_year:04d}-{snap_mon:02d}"

@@ -86,7 +86,7 @@ describe('End-to-End Integration Flow', () => {
       predictionResult.costPrediction,
       predictionResult.timePrediction
     )
-    assert.strictEqual(overallRisk, 'HIGH')
+    assert.ok(['HIGH', 'CRITICAL'].includes(overallRisk), `Expected HIGH or CRITICAL risk, got ${overallRisk}`)
 
     // Step 3: Early Warning Rule Evaluation
     const warnings = evaluateEarlyWarnings(

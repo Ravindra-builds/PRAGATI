@@ -8,6 +8,19 @@ interface PortfolioRiskTrendProps {
   trend: TemporalTrendPoint[]
 }
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatMonthLabel(ym: string): string {
+  const parts = ym.split('-')
+  if (parts.length !== 2) return ym
+  const year = parts[0].slice(-2)
+  const monthIdx = parseInt(parts[1], 10) - 1
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${MONTH_NAMES[monthIdx]} '${year}`
+  }
+  return ym
+}
+
 export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
@@ -19,6 +32,8 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
     )
   }
 
+  const sortedTrend = [...trend].sort((a, b) => a.snapshotMonth.localeCompare(b.snapshotMonth))
+
   // Dimensions
   const width = 760
   const height = 230
@@ -26,7 +41,7 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
 
-  const n = trend.length
+  const n = sortedTrend.length
   const getX = (i: number) => {
     if (n <= 1) return padding.left + chartWidth / 2
     return padding.left + (i / (n - 1)) * chartWidth
@@ -39,7 +54,7 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
 
   // Make SVG path
   const makePath = (key: 'avgPhysicalProgressPct' | 'avgFinancialProgressPct') => {
-    return trend
+    return sortedTrend
       .map((d, i) => {
         const x = getX(i)
         const y = getY(d[key])
@@ -51,9 +66,9 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
   const physicalPath = makePath('avgPhysicalProgressPct')
   const financialPath = makePath('avgFinancialProgressPct')
 
-  const activePoint = hoveredIndex !== null ? trend[hoveredIndex] : null
+  const activePoint = hoveredIndex !== null ? sortedTrend[hoveredIndex] : null
 
-  const latestSnapshot = trend[trend.length - 1]
+  const latestSnapshot = sortedTrend[sortedTrend.length - 1]
   const diff = latestSnapshot
     ? Math.round((latestSnapshot.avgFinancialProgressPct - latestSnapshot.avgPhysicalProgressPct) * 10) / 10
     : 0
@@ -149,11 +164,12 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
           />
 
           {/* Data Points */}
-          {trend.map((d, i) => {
+          {sortedTrend.map((d, i) => {
             const x = getX(i)
             const yPhy = getY(d.avgPhysicalProgressPct)
             const yFin = getY(d.avgFinancialProgressPct)
             const isHovered = hoveredIndex === i
+            const showTick = i === 0 || i === n - 1 || (i % 3 === 0 && n - 1 - i >= 2)
 
             return (
               <g
@@ -195,15 +211,15 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
                   strokeWidth="1.5"
                 />
 
-                {/* X axis tick text (every 3rd or start/end) */}
-                {(i === 0 || i === n - 1 || i % 3 === 0) && (
+                {/* X axis tick text */}
+                {showTick && (
                   <text
                     x={x}
                     y={padding.top + chartHeight + 18}
                     textAnchor="middle"
                     className="text-[10px] fill-slate-500 font-mono"
                   >
-                    {d.snapshotMonth}
+                    {formatMonthLabel(d.snapshotMonth)}
                   </text>
                 )}
               </g>
@@ -214,7 +230,7 @@ export function PortfolioRiskTrend({ trend }: PortfolioRiskTrendProps) {
         {/* Hover Snapshot Tooltip */}
         {activePoint && (
           <div className="absolute top-4 right-4 bg-slate-900/95 text-white px-3 py-2 rounded-lg shadow-md border border-slate-700 text-xs font-mono backdrop-blur-xs flex items-center gap-3">
-            <span className="font-bold text-slate-200">{activePoint.snapshotMonth}</span>
+            <span className="font-bold text-slate-200">{formatMonthLabel(activePoint.snapshotMonth)} ({activePoint.snapshotMonth})</span>
             <span>&bull;</span>
             <span className="text-emerald-400">Delivery: {activePoint.avgPhysicalProgressPct}%</span>
             <span>&bull;</span>

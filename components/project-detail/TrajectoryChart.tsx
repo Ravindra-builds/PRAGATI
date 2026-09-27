@@ -14,6 +14,19 @@ interface TrajectoryChartProps {
   data: SnapshotPoint[]
 }
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatMonthLabel(ym: string): string {
+  const parts = ym.split('-')
+  if (parts.length !== 2) return ym
+  const year = parts[0].slice(-2)
+  const monthIdx = parseInt(parts[1], 10) - 1
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${MONTH_NAMES[monthIdx]} '${year}`
+  }
+  return ym
+}
+
 export function TrajectoryChart({ data }: TrajectoryChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
@@ -25,6 +38,9 @@ export function TrajectoryChart({ data }: TrajectoryChartProps) {
     )
   }
 
+  // Strictly sort snapshots chronologically ascending
+  const sortedData = [...data].sort((a, b) => a.snapshotMonth.localeCompare(b.snapshotMonth))
+
   // Chart dimensions
   const width = 760
   const height = 280
@@ -32,7 +48,9 @@ export function TrajectoryChart({ data }: TrajectoryChartProps) {
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
 
-  const n = data.length
+  const n = sortedData.length
+  const tickStep = Math.max(1, Math.ceil(n / 7))
+
   const getX = (index: number) => {
     if (n <= 1) return padding.left + chartWidth / 2
     return padding.left + (index / (n - 1)) * chartWidth
@@ -45,7 +63,7 @@ export function TrajectoryChart({ data }: TrajectoryChartProps) {
 
   // Generate SVG path for points
   const makePath = (key: 'physicalProgressPct' | 'financialProgressPct') => {
-    return data
+    return sortedData
       .map((d, i) => {
         const x = getX(i)
         const y = getY(d[key])
@@ -63,7 +81,7 @@ export function TrajectoryChart({ data }: TrajectoryChartProps) {
   const baselineY = padding.top + chartHeight
   const physicalArea = `${physicalPath} L ${lastX.toFixed(1)} ${baselineY.toFixed(1)} L ${firstX.toFixed(1)} ${baselineY.toFixed(1)} Z`
 
-  const activePoint = hoveredIndex !== null ? data[hoveredIndex] : null
+  const activePoint = hoveredIndex !== null ? sortedData[hoveredIndex] : null
 
   return (
     <div className="w-full">
@@ -81,7 +99,7 @@ export function TrajectoryChart({ data }: TrajectoryChartProps) {
 
         {activePoint && (
           <div className="text-xs font-mono bg-slate-100 text-slate-800 px-2.5 py-1 rounded-md border border-slate-200">
-            <span className="font-bold">{activePoint.snapshotMonth}</span> &bull; Phy: {activePoint.physicalProgressPct.toFixed(1)}% &bull; Fin: {activePoint.financialProgressPct.toFixed(1)}%
+            <span className="font-bold">{formatMonthLabel(activePoint.snapshotMonth)} ({activePoint.snapshotMonth})</span> &bull; Phy: {activePoint.physicalProgressPct.toFixed(1)}% &bull; Fin: {activePoint.financialProgressPct.toFixed(1)}%
           </div>
         )}
       </div>
@@ -146,11 +164,13 @@ export function TrajectoryChart({ data }: TrajectoryChartProps) {
           />
 
           {/* Interactive Data Dots & Hover trigger */}
-          {data.map((d, i) => {
+          {sortedData.map((d, i) => {
             const x = getX(i)
             const yPhy = getY(d.physicalProgressPct)
             const yFin = getY(d.financialProgressPct)
             const isHovered = hoveredIndex === i
+            const showTick =
+              n <= 7 || i === n - 1 || (i % tickStep === 0 && n - 1 - i >= Math.ceil(tickStep / 2))
 
             return (
               <g
@@ -202,15 +222,15 @@ export function TrajectoryChart({ data }: TrajectoryChartProps) {
                   className="transition-all"
                 />
 
-                {/* X-axis Month Label (Render alternating or all if < 8 points) */}
-                {(n <= 8 || i % Math.ceil(n / 8) === 0 || i === n - 1) && (
+                {/* X-axis Month Label */}
+                {showTick && (
                   <text
                     x={x}
                     y={height - 12}
                     textAnchor="middle"
                     className="text-[10px] fill-slate-500 font-mono"
                   >
-                    {d.snapshotMonth.substring(2)}
+                    {formatMonthLabel(d.snapshotMonth)}
                   </text>
                 )}
               </g>

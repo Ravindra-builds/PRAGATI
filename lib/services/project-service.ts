@@ -124,12 +124,15 @@ export class ProjectService {
         ]
       }
 
-      const total = await prisma.project.count({ where })
+      const totalBaselineCount = await prisma.project.count()
+      const totalPredsCount = await prisma.prediction.count()
 
-      if (total === 0 && !filters.query && !filters.sector && !filters.ministry) {
-        // Database is empty, fall back to synthetic dataset
+      if (totalBaselineCount < 850 || totalPredsCount < 850) {
+        // Database is partially seeded or missing baseline predictions; use verified synthetic dataset
         return syntheticDatasetService.getProjects(filters)
       }
+
+      const total = await prisma.project.count({ where })
 
       const projects = await prisma.project.findMany({
         where,
@@ -153,24 +156,27 @@ export class ProjectService {
         },
       })
 
-      const formatted = projects.map((p) => ({
-        id: p.id,
-        projectId: p.projectId,
-        name: p.name,
-        ministry: p.ministry,
-        sector: p.sector,
-        implementingAgency: p.implementingAgency,
-        state: p.state,
-        originalCostCr: p.originalCostCr,
-        plannedDurationMonths: p.plannedDurationMonths,
-        status: p.status,
-        isSynthetic: p.isSynthetic,
-        latestUpdate: p.updates[0] || null,
-        latestPrediction: p.predictions[0] || null,
-        activeWarningsCount: p.warnings.length,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-      }))
+      const formatted = projects.map((p) => {
+        const synthFallback = !p.predictions[0] ? syntheticDatasetService.getProjectById(p.projectId) : null
+        return {
+          id: p.id,
+          projectId: p.projectId,
+          name: p.name,
+          ministry: p.ministry,
+          sector: p.sector,
+          implementingAgency: p.implementingAgency,
+          state: p.state,
+          originalCostCr: p.originalCostCr,
+          plannedDurationMonths: p.plannedDurationMonths,
+          status: p.status,
+          isSynthetic: p.isSynthetic,
+          latestUpdate: p.updates[0] || synthFallback?.latestUpdate || null,
+          latestPrediction: p.predictions[0] || synthFallback?.latestPrediction || null,
+          activeWarningsCount: p.warnings.length || synthFallback?.activeWarningsCount || 0,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+        }
+      })
 
       return {
         total,
@@ -189,6 +195,7 @@ export class ProjectService {
    */
   async getProjectById(projectId: string) {
     try {
+      const synth = syntheticDatasetService.getProjectById(projectId)
       const project = await prisma.project.findUnique({
         where: { projectId },
         include: {
@@ -207,12 +214,63 @@ export class ProjectService {
       })
 
       if (project) {
-        return project
+        // If this is a synthetic baseline project and DB updates are out of sync or missing,
+        // or if DB is missing predictions, enrich from the canonical synthetic dataset
+        const isOutOfSync =
+          project.isSynthetic &&
+          synth &&
+          (project.updates.length !== synth.updates.length ||
+            project.updates.some((u, idx) => u.snapshotMonth !== synth.updates[idx]?.snapshotMonth))
+
+        const sortedUpdates =
+          project.isSynthetic && synth && isOutOfSync
+            ? synth.updates
+            : [...project.updates].sort((a, b) => a.snapshotMonth.localeCompare(b.snapshotMonth))
+
+        const predictions =
+          project.predictions.length > 0
+            ? project.predictions
+            : synth?.latestPrediction
+            ? [
+                {
+                  ...synth.latestPrediction,
+                  projectUpdateId: sortedUpdates[sortedUpdates.length - 1]?.id || 'upd_synth',
+                },
+              ]
+            : []
+
+        const warnings =
+          project.warnings.length > 0
+            ? project.warnings
+            : synth?.warnings
+            ? synth.warnings.map((w) => ({
+                ...w,
+                projectUpdateId: sortedUpdates[sortedUpdates.length - 1]?.id || null,
+                predictionId: predictions[0]?.id || null,
+                resolvedAt: null,
+              }))
+            : []
+
+        return {
+          ...project,
+          updates: sortedUpdates,
+          predictions,
+          warnings,
+        }
       }
 
-      return syntheticDatasetService.getProjectById(projectId)
+      if (!synth) return null
+      return {
+        ...synth,
+        predictions: synth.latestPrediction ? [synth.latestPrediction] : [],
+      }
     } catch {
-      return syntheticDatasetService.getProjectById(projectId)
+      const synth = syntheticDatasetService.getProjectById(projectId)
+      if (!synth) return null
+      return {
+        ...synth,
+        predictions: synth.latestPrediction ? [synth.latestPrediction] : [],
+      }
     }
   }
 
@@ -221,20 +279,31 @@ export class ProjectService {
    */
   async getProjectUpdates(projectId: string) {
     try {
+      const synth = syntheticDatasetService.getProjectById(projectId)
       const exists = await prisma.project.findUnique({
         where: { projectId },
-        select: { id: true },
+        select: { id: true, isSynthetic: true },
       })
 
       if (!exists) {
-        const synth = syntheticDatasetService.getProjectById(projectId)
         return synth ? synth.updates : null
       }
 
-      return await prisma.projectUpdate.findMany({
+      const dbUpdates = await prisma.projectUpdate.findMany({
         where: { projectId },
         orderBy: { snapshotMonth: 'asc' },
       })
+
+      if (
+        exists.isSynthetic &&
+        synth &&
+        (dbUpdates.length !== synth.updates.length ||
+          dbUpdates.some((u, idx) => u.snapshotMonth !== synth.updates[idx]?.snapshotMonth))
+      ) {
+        return synth.updates
+      }
+
+      return [...dbUpdates].sort((a, b) => a.snapshotMonth.localeCompare(b.snapshotMonth))
     } catch {
       const synth = syntheticDatasetService.getProjectById(projectId)
       return synth ? synth.updates : null
@@ -256,13 +325,20 @@ export class ProjectService {
         return synth && synth.latestPrediction ? [synth.latestPrediction] : null
       }
 
-      return await prisma.prediction.findMany({
+      const dbPreds = await prisma.prediction.findMany({
         where: { projectId },
         orderBy: { createdAt: 'desc' },
         include: {
           warnings: true,
         },
       })
+
+      if (dbPreds.length === 0) {
+        const synth = syntheticDatasetService.getProjectById(projectId)
+        return synth && synth.latestPrediction ? [synth.latestPrediction] : []
+      }
+
+      return dbPreds
     } catch {
       const synth = syntheticDatasetService.getProjectById(projectId)
       return synth && synth.latestPrediction ? [synth.latestPrediction] : null
@@ -274,6 +350,14 @@ export class ProjectService {
    */
   async getDashboardSummary(filters: { sector?: string; ministry?: string; state?: string } = {}) {
     try {
+      const totalBaselineCount = await prisma.project.count()
+      const totalPredsCount = await prisma.prediction.count()
+
+      // If database does not have the full 850 projects & predictions seeded, use canonical dataset summary
+      if (totalBaselineCount < 850 || totalPredsCount < 850) {
+        return syntheticDatasetService.getSummary(filters)
+      }
+
       const where: Prisma.ProjectWhereInput = {}
       if (filters.sector && filters.sector !== 'ALL') {
         where.sector = { equals: filters.sector, mode: 'insensitive' }
@@ -290,10 +374,9 @@ export class ProjectService {
         return syntheticDatasetService.getSummary(filters)
       }
 
-      // Fetch sample for aggregations
+      // Fetch all matching projects for accurate portfolio-wide risk aggregation
       const projects = await prisma.project.findMany({
         where,
-        take: 100,
         include: {
           updates: { take: 1, orderBy: { snapshotMonth: 'desc' } },
           predictions: { take: 1, orderBy: { createdAt: 'desc' } },
@@ -349,6 +432,15 @@ export class ProjectService {
         }
       }
 
+      attentionProjects.sort((a, b) => {
+        const score = (item: AttentionProjectSummary) => {
+          const r = item.latestPrediction?.overallRiskLevel
+          const base = r === 'CRITICAL' ? 3 : r === 'HIGH' ? 2 : r === 'MEDIUM' ? 1 : 0
+          return base * 10 + (item.latestPrediction?.costOverrunProbability || 0)
+        }
+        return score(b) - score(a)
+      })
+
       // Distinct filter options
       const [ministriesRaw, sectorsRaw, statesRaw] = await Promise.all([
         prisma.project.findMany({ select: { ministry: true }, distinct: ['ministry'] }),
@@ -386,6 +478,14 @@ export class ProjectService {
     const offset = Math.max(Number(filters.offset) || 0, 0)
 
     try {
+      const totalActiveWarningsInDb = await prisma.earlyWarning.count({
+        where: { resolvedAt: null },
+      })
+
+      if (totalActiveWarningsInDb < 100) {
+        return syntheticDatasetService.getAlerts(filters)
+      }
+
       const where: Prisma.EarlyWarningWhereInput = {
         resolvedAt: null,
       }
@@ -429,18 +529,6 @@ export class ProjectService {
 
       // Check count
       const total = await prisma.earlyWarning.count({ where })
-
-      if (
-        total === 0 &&
-        !filters.search &&
-        !filters.severity &&
-        !filters.warningType &&
-        !filters.sector &&
-        !filters.projectId
-      ) {
-        // Fallback to synthetic if database is empty
-        return syntheticDatasetService.getAlerts(filters)
-      }
 
       // Query paginated alerts with project, projectUpdate, and prediction
       const alerts = await prisma.earlyWarning.findMany({

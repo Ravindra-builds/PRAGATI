@@ -8,7 +8,7 @@
  * NOT official government ministry policies.
  */
 
-export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
 export interface WarningCandidate {
   warningType: string
@@ -49,6 +49,9 @@ export function calculateOverallRisk(
   costPred: number,
   timePred: number
 ): RiskLevel {
+  if (costProb >= 0.82 && timeProb >= 0.80) {
+    return 'CRITICAL'
+  }
   if (costPred === 1 && timePred === 1) {
     return 'HIGH'
   }

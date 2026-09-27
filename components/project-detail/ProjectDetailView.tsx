@@ -80,6 +80,11 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         throw new Error(`Project not found (HTTP ${res.status})`)
       }
       const data = await res.json()
+      if (Array.isArray(data.updates)) {
+        data.updates.sort((a: { snapshotMonth: string }, b: { snapshotMonth: string }) =>
+          a.snapshotMonth.localeCompare(b.snapshotMonth)
+        )
+      }
       setProject(data)
       setError(null)
 
