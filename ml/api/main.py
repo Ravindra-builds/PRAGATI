@@ -16,16 +16,26 @@ from contextlib import asynccontextmanager
 from typing import Dict, Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-from ml.api.schemas import (
-    PredictionRequest,
-    PredictionResponse,
-    HealthResponse,
-    ModelInfoResponse,
-)
-from ml.api.service import model_service
+try:
+    from .schemas import (
+        PredictionRequest,
+        PredictionResponse,
+        HealthResponse,
+        ModelInfoResponse,
+    )
+    from .service import model_service
+except ImportError:
+    from api.schemas import (
+        PredictionRequest,
+        PredictionResponse,
+        HealthResponse,
+        ModelInfoResponse,
+    )
+    from api.service import model_service
 
 # Configure structured logging
 logging.basicConfig(
@@ -60,6 +70,14 @@ app = FastAPI(
     ),
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

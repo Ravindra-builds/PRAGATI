@@ -30,6 +30,7 @@ if "sklearn.cluster" not in sys.modules:
         sys.modules["sklearn.cluster"] = _fake_mod
 
 import shap
+import shap.maskers
 
 # Deterministic human-readable display name mapping for features
 FEATURE_DISPLAY_NAMES = {

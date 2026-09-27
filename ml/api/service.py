@@ -13,21 +13,37 @@ from typing import Optional, Dict, Any
 import joblib
 import pandas as pd
 
-# Add ml/src to sys.path
+# Add ml/src and ml root to sys.path
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+_ml_root = Path(__file__).resolve().parent.parent
+_src_dir = _ml_root / "src"
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+if str(_ml_root) not in sys.path:
+    sys.path.insert(0, str(_ml_root))
 
 import config
 import features
 import explain
-from ml.api.schemas import (
-    PredictionRequest,
-    PredictionResponse,
-    TargetPredictionResult,
-    RiskDriver,
-    ModelInfoResponse,
-    ModelInfoItem,
-)
+
+try:
+    from .schemas import (
+        PredictionRequest,
+        PredictionResponse,
+        TargetPredictionResult,
+        RiskDriver,
+        ModelInfoResponse,
+        ModelInfoItem,
+    )
+except ImportError:
+    from api.schemas import (
+        PredictionRequest,
+        PredictionResponse,
+        TargetPredictionResult,
+        RiskDriver,
+        ModelInfoResponse,
+        ModelInfoItem,
+    )
 
 logger = logging.getLogger("ml_inference_service")
 
@@ -49,7 +65,7 @@ class ModelService:
     def load_models(self) -> None:
         """
         Loads the trained pipelines and metadata into memory.
-        Fails fast if artifacts are missing or corrupt.
+        Automatically builds artifacts via train_models if .joblib files are missing (e.g. fresh cloud deploy).
         """
         start_time = time.perf_counter()
         logger.info("Initializing ML Model Service: Loading model artifacts...")
@@ -58,6 +74,14 @@ class ModelService:
         cost_meta_path = config.COST_OVERRUN_MODEL_DIR / "metadata.json"
         time_model_path = config.TIME_OVERRUN_MODEL_DIR / "model.joblib"
         time_meta_path = config.TIME_OVERRUN_MODEL_DIR / "metadata.json"
+
+        # Self-healing fallback: train models automatically if .joblib binaries are not present
+        if not cost_model_path.exists() or not time_model_path.exists():
+            logger.warning(
+                "Trained .joblib model artifacts not found on disk. Training models automatically..."
+            )
+            import train_models
+            train_models.train_and_evaluate_all()
 
         # Verify existence
         for p in [cost_model_path, cost_meta_path, time_model_path, time_meta_path]:
