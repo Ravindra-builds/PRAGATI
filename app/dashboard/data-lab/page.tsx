@@ -48,6 +48,7 @@ export interface OfficialFieldSpec {
   label: string
   category: 'Identification' | 'Administrative Oversight' | 'Financial Telemetry' | 'Timeline Telemetry' | 'Milestones & Execution'
   required: boolean
+  statusBadge?: 'REQUIRED' | 'AUTO-DERIVED' | 'OPTIONAL'
   requirementDesc: string
   whyNeeded: string
   example: string
@@ -57,22 +58,24 @@ export interface OfficialFieldSpec {
 export const OFFICIAL_FIELD_SPECS: OfficialFieldSpec[] = [
   {
     key: 'project_id',
-    label: 'Project Code / ID',
+    label: 'Project Code / PAIMANA ID',
     category: 'Identification',
     required: true,
-    requirementDesc: 'Unique reference code (e.g. PRJ-101, NH-48)',
-    whyNeeded: 'Uniquely anchors this asset across monthly monitoring snapshots without collisions.',
-    example: 'PRJ-PUB-101',
-    reportHeaders: ['Project Code', 'Project ID', 'Sanction ID', 'Code', 'Project Number'],
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'Official PAIMANA / OCMS code (e.g. PAIMANA-400259, PRJ-101)',
+    whyNeeded: 'Uniquely anchors this asset across monthly MoSPI Flash Report snapshots without collisions.',
+    example: 'PAIMANA-400259',
+    reportHeaders: ['Project Code', 'PAIMANA ID', 'OCMS Code', 'Project ID', 'Sanction ID'],
   },
   {
     key: 'project_name',
     label: 'Project Title / Name',
     category: 'Identification',
     required: false,
+    statusBadge: 'OPTIONAL',
     requirementDesc: 'Official asset title or descriptive scheme name',
     whyNeeded: 'Identifies the project clearly on executive ministerial monitoring dashboards.',
-    example: 'Mumbai-Goa Highway Widening Package 3',
+    example: 'Ghatampur Thermal Power Project (3x660 MW)',
     reportHeaders: ['Project Title', 'Project Name', 'Scheme Name', 'Name of Project'],
   },
   {
@@ -80,109 +83,120 @@ export const OFFICIAL_FIELD_SPECS: OfficialFieldSpec[] = [
     label: 'Nodal Ministry',
     category: 'Administrative Oversight',
     required: true,
-    requirementDesc: 'Union Ministry or Department name',
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'Central Ministry or Department (MoSPI & symbols auto-normalized)',
     whyNeeded: 'Assigns administrative accountability and inter-departmental governance.',
     example: 'Ministry of Road Transport and Highways',
-    reportHeaders: ['Nodal Ministry', 'Ministry', 'Department', 'Central Ministry'],
+    reportHeaders: ['Nodal Ministry', 'Ministry', 'Central Ministry', 'Department'],
   },
   {
     key: 'sector',
     label: 'Infrastructure Sector',
     category: 'Administrative Oversight',
     required: true,
-    requirementDesc: 'Sector domain (e.g. Roads, Railways, Power, Urban Transport)',
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'Sector domain (Roads & Highways, Railways, Power, Urban Development, etc.)',
     whyNeeded: 'Enables sector-specific risk baseline scoring in the ML prediction model.',
-    example: 'Roads & Highways',
-    reportHeaders: ['Sector', 'Infrastructure Sector', 'Domain', 'Category'],
+    example: 'Roads and Highways',
+    reportHeaders: ['Sector', 'Infrastructure Sector', 'Project Sector', 'Domain'],
   },
   {
     key: 'implementing_agency',
     label: 'Implementing Agency',
     category: 'Administrative Oversight',
     required: true,
-    requirementDesc: 'Executing PSU or statutory authority (e.g. NHAI, RVNL, BMRCL)',
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'Executing PSU or authority (e.g. NHAI, RVNL, NTPC, [AAI], BMRCL)',
     whyNeeded: 'Evaluates institutional execution capacity and historical slippage patterns.',
     example: 'NHAI',
-    reportHeaders: ['Executing Agency', 'Implementing Agency', 'Authority', 'PSU', 'Agency'],
+    reportHeaders: ['Executing Agency', 'Implementing Agency', 'Agency', 'PSU', 'Authority'],
   },
   {
     key: 'state',
     label: 'State / Location',
     category: 'Administrative Oversight',
     required: true,
-    requirementDesc: 'State or Union Territory location',
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'State, Union Territory, or Multi State corridor',
     whyNeeded: 'Accounts for regional terrain, land acquisition factors, and monsoon weather windows.',
-    example: 'Maharashtra',
-    reportHeaders: ['State', 'State/UT', 'Location', 'Region'],
+    example: 'Uttar Pradesh',
+    reportHeaders: ['State', 'State/UT', 'Location', 'Project State'],
   },
   {
     key: 'original_cost_cr',
     label: 'Sanctioned Cost (₹ Cr)',
     category: 'Financial Telemetry',
     required: true,
-    requirementDesc: 'Approved budget in ₹ Crores (₹/Cr/Lakhs auto-converted)',
-    whyNeeded: 'Approved capital outlay baseline. Essential for calculating cost escalation risk.',
-    example: '₹ 1,450.0 Cr',
-    reportHeaders: ['Sanctioned Cost', 'Approved Cost', 'Original Cost (Cr)', 'Approved Budget'],
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'Original approved budget in ₹ Crores (₹/Cr/Lakhs auto-converted)',
+    whyNeeded: 'Approved capital outlay baseline. Essential for calculating cost escalation risk without target leakage.',
+    example: '₹ 17,237.80 Cr',
+    reportHeaders: ['Sanctioned Cost (Cr)', 'Original Cost', 'Original Cost (Rs. in Crore)', 'Approved Cost'],
   },
   {
     key: 'planned_duration_months',
     label: 'Contractual Duration (Months)',
     category: 'Timeline Telemetry',
     required: true,
-    requirementDesc: 'Approved contractual schedule in months',
-    whyNeeded: 'Target completion baseline used by the Random Forest delay prediction model.',
-    example: '36 months',
-    reportHeaders: ['Duration (Months)', 'Planned Duration', 'Contractual Duration', 'Duration'],
+    statusBadge: 'AUTO-DERIVED',
+    requirementDesc: 'Approved schedule in months (or auto-derived from Start Date & Original DoC)',
+    whyNeeded: 'Target completion baseline used by the 150-tree Random Forest delay prediction model.',
+    example: '66 months (or 07/2016 -> 01/2022)',
+    reportHeaders: ['Duration (Months)', 'Planned Duration', 'Original DoC', 'Contractual Duration'],
   },
   {
     key: 'elapsed_months',
     label: 'Time Elapsed (Months)',
     category: 'Timeline Telemetry',
     required: true,
-    requirementDesc: 'Months passed since project commencement',
-    whyNeeded: 'Calculates the project timeline consumption velocity against approved milestones.',
-    example: '24 months',
-    reportHeaders: ['Time Elapsed', 'Elapsed Months', 'Months Since Commencement'],
+    statusBadge: 'AUTO-DERIVED',
+    requirementDesc: 'Months since start (can exceed Contractual Duration for delayed PAIMANA projects)',
+    whyNeeded: 'Measures true timeline consumption velocity; uncapped for Random Forest schedule overrun detection.',
+    example: '100 months',
+    reportHeaders: ['Time Elapsed', 'Elapsed Months', 'Start Date', 'Date of Approval'],
   },
   {
     key: 'physical_progress_pct',
     label: 'Physical Progress (%)',
     category: 'Milestones & Execution',
     required: true,
-    requirementDesc: 'Ground progress between 0% and 100% (e.g. 42.5%)',
-    whyNeeded: 'Civil construction milestone completion verified on ground.',
-    example: '42.5 %',
-    reportHeaders: ['Physical Progress %', 'Physical %', 'Civil Progress', 'Work Done %'],
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'Cumulative physical work completed between 0% and 100%',
+    whyNeeded: 'Ground construction progress verified in monthly PAIMANA / OCMS Flash Reports.',
+    example: '96.26 %',
+    reportHeaders: ['Physical Progress %', 'Physical Progress (%)', 'Physical %', 'Work Done %'],
   },
   {
     key: 'financial_progress_pct',
     label: 'Financial Progress (%)',
     category: 'Financial Telemetry',
     required: true,
-    requirementDesc: 'Fund expenditure pace between 0% and 100% (e.g. 58.0%)',
-    whyNeeded: 'Disbursement progress. Paired with physical progress to detect premature fund burn.',
-    example: '58.0 %',
-    reportHeaders: ['Financial Progress %', 'Financial %', 'Expenditure %', 'Fund Utilization %'],
+    statusBadge: 'AUTO-DERIVED',
+    requirementDesc: 'Fund utilization % (auto-derived from Cumulative Spent / Original Cost if omitted)',
+    whyNeeded: 'Paired with physical progress to detect premature budget burn or cost escalation.',
+    example: '80.27 % (Auto-derived if omitted)',
+    reportHeaders: ['Financial %', 'Financial Progress %', 'Financial Progress (%)', 'Fund Utilization %'],
   },
   {
     key: 'expenditure_cr',
     label: 'Cumulative Spent (₹ Cr)',
     category: 'Financial Telemetry',
     required: true,
-    requirementDesc: 'Total expenditure to date in ₹ Crores',
-    whyNeeded: 'Measures funds disbursed against approved sanction to calculate financial burn gap.',
-    example: '₹ 841.0 Cr',
-    reportHeaders: ['Spent (Cr)', 'Expenditure (Cr)', 'Cumulative Spent', 'Actual Cost'],
+    statusBadge: 'REQUIRED',
+    requirementDesc: 'Cumulative expenditure incurred to date in ₹ Crores',
+    whyNeeded: 'Measures actual funds disbursed against original sanction to compute budget utilization.',
+    example: '₹ 20,856.67 Cr',
+    reportHeaders: ['Spent (Cr)', 'Cumulative Expenditure', 'Cum. Expenditure', 'Expenditure (Cr)'],
   },
   {
     key: 'milestones_total',
     label: 'Total Milestones',
     category: 'Milestones & Execution',
     required: true,
-    requirementDesc: 'Count of key project deliverables (e.g. 8)',
-    whyNeeded: 'Denominator for milestone delay ratio used by the schedule prediction model.',
-    example: '8',
+    statusBadge: 'AUTO-DERIVED',
+    requirementDesc: 'Total deliverables (auto-defaults to 10-stage PAIMANA baseline if omitted)',
+    whyNeeded: 'Denominator for milestone slippage ratio in the schedule delay model.',
+    example: '10 (Auto-filled for public PAIMANA PDFs)',
     reportHeaders: ['Milestones Total', 'Total Milestones', 'Planned Deliverables'],
   },
   {
@@ -190,30 +204,33 @@ export const OFFICIAL_FIELD_SPECS: OfficialFieldSpec[] = [
     label: 'Delayed Milestones',
     category: 'Milestones & Execution',
     required: true,
-    requirementDesc: 'Milestones currently behind schedule',
-    whyNeeded: 'Primary early indicator for critical path slippage and execution bottlenecks.',
-    example: '3',
-    reportHeaders: ['Delayed Milestones', 'Milestone Slippages', 'Delayed Deliverables'],
+    statusBadge: 'AUTO-DERIVED',
+    requirementDesc: 'Slipping milestones (auto-estimated from PAIMANA schedule-progress gap if omitted)',
+    whyNeeded: 'Bridges public MoSPI Flash Reports (which omit internal CRIP milestone counts) with the ML model.',
+    example: '3 (Auto-derived if omitted)',
+    reportHeaders: ['Delayed Milestones', 'Milestone Slippages', 'Slipped Milestones'],
   },
   {
     key: 'project_status',
     label: 'Current Status',
     category: 'Administrative Oversight',
     required: true,
-    requirementDesc: 'Ongoing, Delayed, Critical, or Completed',
-    whyNeeded: 'Current operational classification recorded in official project reports.',
-    example: 'Critical',
-    reportHeaders: ['Current Status', 'Project Status', 'Execution Status'],
+    statusBadge: 'AUTO-DERIVED',
+    requirementDesc: 'Ongoing, Delayed, or Critical (auto-classified from schedule lag if omitted)',
+    whyNeeded: 'Operational classification reflecting whether baseline timeline or milestones have been breached.',
+    example: 'Critical / Delayed / Ongoing',
+    reportHeaders: ['Current Status', 'Project Status', 'Status'],
   },
   {
     key: 'snapshot_month',
     label: 'Observation Period',
     category: 'Administrative Oversight',
     required: false,
-    requirementDesc: 'Reporting month in YYYY-MM (auto-defaults to current month if omitted)',
-    whyNeeded: 'Anchors the monitoring period date for chronological telemetry tracking.',
-    example: '2025-06',
-    reportHeaders: ['Reporting Month', 'Observation Period', 'As On Date', 'Month'],
+    statusBadge: 'AUTO-DERIVED',
+    requirementDesc: 'Flash Report month in YYYY-MM or MM/YYYY (auto-defaults to current month if omitted)',
+    whyNeeded: 'Anchors the monitoring period date for longitudinal backtesting and elapsed time calculation.',
+    example: '2026-08',
+    reportHeaders: ['Observation Month', 'Reporting Month', 'Flash Report Month', 'As On Date'],
   },
 ]
 
@@ -825,11 +842,11 @@ export default function DataLabPage() {
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-700" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  PRAGATI Project Monitoring Parameter Checklist
+                  MoSPI PAIMANA &amp; PRAGATI Monitoring Parameter Checklist
                 </h3>
               </div>
               <p className="text-xs text-slate-600 mt-0.5">
-                The PRAGATI risk evaluation engine relies on 15 core parameters found in standard MoSPI and PAIMANA reports. Below is a plain-language guide on what each parameter means and why it matters:
+                PRAGATI evaluates 15 monitoring parameters from official MoSPI PAIMANA / OCMS Flash Reports (FY 2025–26 &amp; FY 2026–27). Parameters marked <span className="font-semibold text-blue-700">AUTO-DERIVED</span> are automatically calculated by PRAGATI if omitted in public Flash Report uploads:
               </p>
             </div>
             <button
@@ -841,43 +858,48 @@ export default function DataLabPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {OFFICIAL_FIELD_SPECS.map(spec => (
-              <div
-                key={spec.key}
-                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors space-y-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-900">
-                    {spec.label}
-                  </span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${
-                      spec.required
-                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                    }`}
-                  >
-                    {spec.required ? 'REQUIRED' : 'OPTIONAL'}
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-600 leading-snug">
-                  <span className="font-semibold text-slate-800">Why Needed: </span>
-                  {spec.whyNeeded}
-                </p>
-
-                <div className="pt-1 border-t border-slate-200/60 text-[10.5px] space-y-1">
-                  <div className="text-slate-700">
-                    <span className="font-medium text-slate-500">Expected Format: </span>
-                    {spec.requirementDesc}
+            {OFFICIAL_FIELD_SPECS.map(spec => {
+              const badge = spec.statusBadge || (spec.required ? 'REQUIRED' : 'OPTIONAL')
+              return (
+                <div
+                  key={spec.key}
+                  className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-900">
+                      {spec.label}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${
+                        badge === 'REQUIRED'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : badge === 'AUTO-DERIVED'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {badge}
+                    </span>
                   </div>
-                  <div className="text-slate-500 truncate">
-                    <span className="font-medium text-slate-500">Report Headers: </span>
-                    {spec.reportHeaders.slice(0, 3).join(', ')}
+
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    <span className="font-semibold text-slate-800">Why Needed: </span>
+                    {spec.whyNeeded}
+                  </p>
+
+                  <div className="pt-1 border-t border-slate-200/60 text-[10.5px] space-y-1">
+                    <div className="text-slate-700">
+                      <span className="font-medium text-slate-500">Expected Format: </span>
+                      {spec.requirementDesc}
+                    </div>
+                    <div className="text-slate-500 truncate">
+                      <span className="font-medium text-slate-500">PAIMANA Headers: </span>
+                      {spec.reportHeaders.slice(0, 3).join(', ')}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -1358,7 +1380,7 @@ export default function DataLabPage() {
                   </h3>
                 </div>
                 <p className="text-xs text-slate-600 mt-1">
-                  Run the existing Cost Overrun (Logistic/Gradient-Boosted) and Schedule Delay (Random Forest) models with SHAP explainability.
+                  Run the trained Cost Overrun (L2 Logistic Regression) and Schedule Delay (Random Forest &bull; 150 Trees) models with SHAP explainability.
                 </p>
               </div>
 
@@ -1432,7 +1454,7 @@ export default function DataLabPage() {
                         <span>{p.projectId}</span>
                         <span
                           className={`w-2 h-2 rounded-full ${
-                            p.overallRiskLevel === 'HIGH'
+                            p.overallRiskLevel === 'CRITICAL' || p.overallRiskLevel === 'HIGH'
                               ? 'bg-rose-400'
                               : p.overallRiskLevel === 'MEDIUM'
                               ? 'bg-amber-400'
@@ -1466,6 +1488,7 @@ export default function DataLabPage() {
                     <span className="text-xs text-slate-500 font-medium">Overall Composite Risk:</span>
                     <span
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        activePrediction.overallRiskLevel === 'CRITICAL' ||
                         activePrediction.overallRiskLevel === 'HIGH'
                           ? 'bg-rose-50 text-rose-700 border border-rose-200'
                           : activePrediction.overallRiskLevel === 'MEDIUM'
@@ -1481,19 +1504,43 @@ export default function DataLabPage() {
                 {/* Dual Target Probability Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Cost Overrun Card */}
-                  <div className="p-4 rounded-xl border border-rose-100 bg-rose-50/40 space-y-3">
+                  <div
+                    className={`p-4 rounded-xl border space-y-3 ${
+                      activePrediction.costRiskLevel === 'HIGH'
+                        ? 'border-rose-200 bg-rose-50/40'
+                        : 'border-emerald-200 bg-emerald-50/40'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-rose-600" />
+                        <TrendingUp
+                          className={`w-4 h-4 ${
+                            activePrediction.costRiskLevel === 'HIGH'
+                              ? 'text-rose-600'
+                              : 'text-emerald-600'
+                          }`}
+                        />
                         <span className="text-xs font-bold text-slate-900">Cost Overrun Risk</span>
                       </div>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          activePrediction.costRiskLevel === 'HIGH'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
                         {activePrediction.costRiskLevel}
                       </span>
                     </div>
 
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl sm:text-3xl font-extrabold text-rose-700 font-mono">
+                      <span
+                        className={`text-2xl sm:text-3xl font-extrabold font-mono ${
+                          activePrediction.costRiskLevel === 'HIGH'
+                            ? 'text-rose-700'
+                            : 'text-emerald-700'
+                        }`}
+                      >
                         {(activePrediction.costOverrunProbability * 100).toFixed(1)}%
                       </span>
                       <span className="text-xs text-slate-500 font-medium">Probability</span>
@@ -1502,26 +1549,54 @@ export default function DataLabPage() {
                     {/* Progress Bar */}
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                       <div
-                        className="bg-rose-600 h-full rounded-full transition-all duration-500"
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          activePrediction.costRiskLevel === 'HIGH'
+                            ? 'bg-rose-600'
+                            : 'bg-emerald-600'
+                        }`}
                         style={{ width: `${activePrediction.costOverrunProbability * 100}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Schedule Delay Card */}
-                  <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/40 space-y-3">
+                  <div
+                    className={`p-4 rounded-xl border space-y-3 ${
+                      activePrediction.timeRiskLevel === 'HIGH'
+                        ? 'border-amber-200 bg-amber-50/40'
+                        : 'border-emerald-200 bg-emerald-50/40'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-amber-600" />
+                        <Clock
+                          className={`w-4 h-4 ${
+                            activePrediction.timeRiskLevel === 'HIGH'
+                              ? 'text-amber-600'
+                              : 'text-emerald-600'
+                          }`}
+                        />
                         <span className="text-xs font-bold text-slate-900">Schedule Delay Risk</span>
                       </div>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          activePrediction.timeRiskLevel === 'HIGH'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
                         {activePrediction.timeRiskLevel}
                       </span>
                     </div>
 
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl sm:text-3xl font-extrabold text-amber-700 font-mono">
+                      <span
+                        className={`text-2xl sm:text-3xl font-extrabold font-mono ${
+                          activePrediction.timeRiskLevel === 'HIGH'
+                            ? 'text-amber-700'
+                            : 'text-emerald-700'
+                        }`}
+                      >
                         {(activePrediction.timeOverrunProbability * 100).toFixed(1)}%
                       </span>
                       <span className="text-xs text-slate-500 font-medium">Probability</span>
@@ -1530,7 +1605,11 @@ export default function DataLabPage() {
                     {/* Progress Bar */}
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                       <div
-                        className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          activePrediction.timeRiskLevel === 'HIGH'
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-600'
+                        }`}
                         style={{ width: `${activePrediction.timeOverrunProbability * 100}%` }}
                       />
                     </div>
@@ -1800,13 +1879,13 @@ export default function DataLabPage() {
                   <ProcessingStepItem
                     number={2}
                     title="Dual-Target ML Pipeline Invocation"
-                    description="Cost Overrun (Logistic/Gradient-Boosted) + Schedule Delay (Random Forest)"
+                    description="Cost Overrun (L2 Logistic Regression) + Schedule Delay (Random Forest • 150 Trees)"
                     isActive={processingSubStep === 2}
                     isDone={processingSubStep > 2}
                   />
                   <ProcessingStepItem
                     number={3}
-                    title="TreeExplainer SHAP Root Cause Attribution"
+                    title="Linear & TreeSHAP Root Cause Attribution"
                     description="Computing local Shapley values for positive and negative risk drivers"
                     isActive={processingSubStep >= 3}
                     isDone={false}

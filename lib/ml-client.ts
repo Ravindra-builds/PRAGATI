@@ -140,40 +140,51 @@ export class MLClient {
 
   /**
    * Execute real-time dual-target inference.
-   * Sends observation-time payload to FastAPI and rigorously validates response structure and numeric bounds.
+   * Sends observation-time payload to FastAPI (when online) or executes the exact
+   * trained model weights (`ml/models/exported_weights.json`) in-process if the
+   * external FastAPI server is not running locally.
    */
   async predictOverrun(payload: PredictPayload): Promise<PredictResponse> {
     // Validate payload locally before dispatching
     const validatedPayload = PredictPayloadSchema.parse(payload)
 
     const url = `${this.baseUrl}/predict`
-    let response: Response
+    let response: Response | null = null
 
     try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validatedPayload),
-        cache: 'no-store',
-      })
-    } catch (err) {
-      throw new MLServiceUnavailableError(`Failed to connect to ML inference service at ${url}: ${String(err)}`)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3500)
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validatedPayload),
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
+    } catch {
+      // FastAPI server is offline locally; execute exact exported model weights (LogisticRegression + 150-tree RandomForest)
+      const { predictWithEmbeddedWeights } = await import('./ml-local-engine')
+      const localResult = predictWithEmbeddedWeights(validatedPayload)
+      return PredictResponseSchema.parse(localResult)
     }
 
     if (!response.ok) {
+      // If local FastAPI returned 422 on an older schema or 502/503, fall back to embedded weights
+      if (response.status === 422 || response.status >= 500) {
+        const { predictWithEmbeddedWeights } = await import('./ml-local-engine')
+        const localResult = predictWithEmbeddedWeights(validatedPayload)
+        return PredictResponseSchema.parse(localResult)
+      }
+
       let errBody: unknown
       try {
         errBody = await response.json()
       } catch {
         errBody = await response.text()
-      }
-
-      if (response.status === 422) {
-        throw new MLServiceError(
-          `ML Service rejected prediction request with 422 Unprocessable Entity`,
-          422,
-          errBody
-        )
       }
 
       throw new MLServiceError(

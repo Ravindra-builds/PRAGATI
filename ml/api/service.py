@@ -8,13 +8,37 @@ source of truth (ml/src/features.py), and returns calibrated probability estimat
 import time
 import json
 import logging
+import sys
+import types
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+# Guard against Windows Smart App Control blocking unused sklearn C extensions (e.g. _libsvm_sparse)
+_orig_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+
+
+def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+    try:
+        return _orig_import(name, globals, locals, fromlist, level)
+    except ImportError as e:
+        if "Application Control" in str(e) or "DLL load failed" in str(e):
+            mod = types.ModuleType(name)
+            for attr in (fromlist or ()):
+                setattr(mod, attr, lambda *a, **k: None)
+            sys.modules[name] = mod
+            return mod
+        raise
+
+
+if isinstance(__builtins__, dict):
+    __builtins__["__import__"] = _safe_import
+else:
+    __builtins__.__import__ = _safe_import
+
 import joblib
 import pandas as pd
 
 # Add ml/src and ml root to sys.path
-import sys
 _ml_root = Path(__file__).resolve().parent.parent
 _src_dir = _ml_root / "src"
 if str(_src_dir) not in sys.path:

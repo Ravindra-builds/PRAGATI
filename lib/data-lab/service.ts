@@ -12,6 +12,7 @@ import { prisma } from '@/lib/db'
 import {
   CanonicalProjectRecord,
   CanonicalFieldKey,
+  CANONICAL_FIELDS,
   ExtractionResult,
   MappingSummary,
   CleaningReport,
@@ -49,7 +50,7 @@ export class DataLabService {
         mappingSummary: {
           totalSourceFields: 0,
           mappedRequiredCount: 0,
-          totalRequiredCount: 15,
+          totalRequiredCount: CANONICAL_FIELDS.filter(f => f.required).length,
           unmappedSourceFields: [],
           missingRequiredCanonical: [],
           mappings: [],
@@ -246,29 +247,7 @@ export class DataLabService {
         })
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err)
-        // Safe fallback if ML inference encounters unexpected error
-        results.push({
-          recordIndex: i,
-          projectId: rec.project_id,
-          projectName: rec.project_name || rec.project_id,
-          costOverrunProbability: 0.5,
-          costPrediction: 0,
-          costRiskLevel: 'LOW',
-          timeOverrunProbability: 0.5,
-          timePrediction: 0,
-          timeRiskLevel: 'LOW',
-          overallRiskLevel: 'LOW',
-          costDrivers: [],
-          timeDrivers: [],
-          earlyWarnings: [
-            {
-              warningType: 'ML_INFERENCE_WARNING',
-              severity: 'LOW',
-              title: 'Inference Fallback',
-              message: `Prediction evaluated with standard fallback: ${errMsg}`,
-            },
-          ],
-        })
+        throw new Error(`ML prediction failed for project ${rec.project_id}: ${errMsg}`)
       }
     }
 
@@ -372,8 +351,8 @@ export class DataLabService {
             costPrediction: pred.costPrediction,
             timeOverrunProbability: pred.timeOverrunProbability,
             timePrediction: pred.timePrediction,
-            costModelVersion: provenance.modelVersion || 'v1.0-logistic',
-            timeModelVersion: provenance.modelVersion || 'v1.0-rf',
+            costModelVersion: provenance.modelVersion || 'Logistic Regression (L2)',
+            timeModelVersion: provenance.modelVersion || 'Random Forest (150 trees)',
             overallRiskLevel: pred.overallRiskLevel,
           },
         })

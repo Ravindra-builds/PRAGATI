@@ -161,9 +161,16 @@ class ModelExplainer:
             else:
                 raw_contributions = np.array(shap_values)[0]
         elif target == "cost_overrun":
-            # Logistic Regression LinearExplainer
+            # Logistic Regression LinearExplainer (rescale log-odds attributions to probability delta)
             linear_res = self.cost_explainer(X_trans)
-            raw_contributions = np.array(linear_res.values[0])
+            raw_logit_contribs = np.array(linear_res.values[0], dtype=float)
+            sum_abs = float(np.sum(np.abs(raw_logit_contribs)))
+            lr_clf = self.cost_pipeline.named_steps["classifier"]
+            prob = float(lr_clf.predict_proba(X_trans)[:, 1][0])
+            base_prob = float(1.0 / (1.0 + np.exp(-float(lr_clf.intercept_[0]))))
+            prob_swing = max(0.05, abs(prob - base_prob))
+            scale = (prob_swing / sum_abs) if sum_abs > 1e-6 else 1.0
+            raw_contributions = raw_logit_contribs * scale
         else:
             raise ValueError(f"Unknown target for explanation: {target}")
 
