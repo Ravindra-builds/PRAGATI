@@ -29,6 +29,12 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'project number',
     'project_no',
     'project no',
+    'paimana_id',
+    'paimana id',
+    'paimana_code',
+    'ocms_code',
+    'ocms code',
+    'ocms_id',
   ],
   snapshot_month: [
     'snapshot_month',
@@ -43,6 +49,8 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'monitoring_month',
     'date',
     'snapshot_date',
+    'flash_report_month',
+    'flash report month',
   ],
   ministry: [
     'ministry',
@@ -52,6 +60,7 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'department',
     'dept',
     'ministry / department',
+    'central ministry',
   ],
   sector: [
     'sector',
@@ -60,6 +69,7 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'domain',
     'industry',
     'category',
+    'project_sector',
   ],
   implementing_agency: [
     'implementing_agency',
@@ -72,6 +82,7 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'developer',
     'organization',
     'org',
+    'implementing agency',
   ],
   state: [
     'state',
@@ -81,6 +92,7 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'region',
     'geography',
     'state_name',
+    'project_state',
   ],
   original_cost_cr: [
     'original_cost_cr',
@@ -97,6 +109,8 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'original_estimate',
     'cost_cr',
     'original budget',
+    'original cost (rs. in crore)',
+    'cost original',
   ],
   planned_duration_months: [
     'planned_duration_months',
@@ -140,6 +154,8 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'work_done_pct',
     'work_progress_%',
     'physical %',
+    'physical progress (%)',
+    'cumulative physical progress',
   ],
   financial_progress_pct: [
     'financial_progress_pct',
@@ -151,6 +167,7 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'budget_spent_pct',
     'fund_utilization_pct',
     'financial %',
+    'financial progress (%)',
   ],
   expenditure_cr: [
     'expenditure_cr',
@@ -162,6 +179,10 @@ export const FIELD_ALIASES: Record<CanonicalFieldKey, string[]> = {
     'spent_cr',
     'total_spent',
     'cost_incurred',
+    'cumulative expenditure',
+    'cum. expenditure',
+    'cum expenditure',
+    'cumulative expenditure (rs. in crore)',
   ],
   milestones_total: [
     'milestones_total',

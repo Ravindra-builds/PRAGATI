@@ -56,11 +56,9 @@ class PredictionRequest(BaseModel):
     @model_validator(mode="after")
     def validate_logical_constraints(self):
         """Cross-field validation for lifecycle bounds and milestone consistency."""
-        if self.elapsed_months > self.planned_duration_months:
-            raise ValueError(
-                f"elapsed_months ({self.elapsed_months}) cannot exceed planned_duration_months ({self.planned_duration_months}) "
-                "for active project monitoring snapshots."
-            )
+        # Note: Real-world PAIMANA/OCMS monitoring snapshots frequently have
+        # elapsed_months > planned_duration_months when an active project has
+        # already breached its original contractual completion date.
         if self.milestones_delayed > self.milestones_total:
             raise ValueError(
                 f"milestones_delayed ({self.milestones_delayed}) cannot exceed milestones_total ({self.milestones_total})."

@@ -285,6 +285,145 @@ export function extractFromXLSX(buffer: Buffer, filename: string): ExtractionRes
   }
 }
 
+const KNOWN_PAIMANA_MINISTRIES = new Set([
+  'Ministry of Road Transport & Highways',
+  'Ministry of Road Transport and Highways',
+  'Ministry of Railways',
+  'Ministry of Petroleum & Natural Gas',
+  'Ministry of Petroleum and Natural Gas',
+  'Ministry of Power',
+  'Ministry of Coal',
+  'Ministry of Housing & Urban Affairs',
+  'Ministry of Housing and Urban Affairs',
+  'Ministry of Civil Aviation',
+  'Ministry of Ports, Shipping and Waterways',
+  'Department of Water Resources, River Development & Ganga Rejuvenation',
+  'Ministry of Jal Shakti',
+])
+
+const KNOWN_PAIMANA_SECTORS = new Set([
+  'Roads & Highways',
+  'Railways',
+  'Petroleum & Natural Gas',
+  'Petroleum',
+  'Power',
+  'Coal',
+  'Urban Development',
+  'Housing & Urban Affairs',
+  'Civil Aviation',
+  'Ports & Shipping',
+  'Water Resources',
+])
+
+/**
+ * Extracts structured project records from official MoSPI PAIMANA Flash Report PDF/text tables
+ * (detecting [PAIMANA-xxxxxx] project identifiers, MM/YYYY dates, costs, expenditure, and progress).
+ */
+function extractPaimanaFlashReportRows(text: string): Record<string, unknown>[] {
+  if (!text.includes('PAIMANA-')) return []
+
+  const lines = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+
+  let currentMinistry = 'Ministry of Road Transport and Highways'
+  let currentSector = 'Roads & Highways'
+  const records: Record<string, unknown>[] = []
+  const paimanaIdRe = /\[PAIMANA-(\d{5,7})\]/
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (KNOWN_PAIMANA_MINISTRIES.has(line)) {
+      currentMinistry = line
+      if (i + 1 < lines.length && KNOWN_PAIMANA_SECTORS.has(lines[i + 1])) {
+        currentSector = lines[i + 1]
+      }
+      continue
+    }
+    if (KNOWN_PAIMANA_SECTORS.has(line)) {
+      currentSector = line
+      continue
+    }
+
+    const match = line.match(paimanaIdRe)
+    if (!match) continue
+
+    const code = match[1]
+    const projectId = `PAIMANA-${code}`
+
+    // Gather project name from preceding 1-2 lines + text before [PAIMANA-...]
+    const nameParts: string[] = []
+    for (let b = Math.max(0, i - 2); b < i; b++) {
+      const prev = lines[b]
+      if (
+        !paimanaIdRe.test(prev) &&
+        !KNOWN_PAIMANA_MINISTRIES.has(prev) &&
+        !KNOWN_PAIMANA_SECTORS.has(prev) &&
+        !/^\d+$/.test(prev) &&
+        !/\d{2}\/\d{4}/.test(prev)
+      ) {
+        nameParts.push(prev.replace(/^\d+\s+/, ''))
+      }
+    }
+    const prefix = line.slice(0, match.index).replace(/^\d+\s+/, '').trim()
+    if (prefix) nameParts.push(prefix)
+    const projectName = nameParts.join(' ').trim() || projectId
+
+    // Gather forward lines up to next [PAIMANA-...] or 8 lines
+    const fwdParts: string[] = []
+    const suffix = line.slice((match.index || 0) + match[0].length).trim()
+    if (suffix) fwdParts.push(suffix)
+    for (let f = i + 1; f < Math.min(lines.length, i + 8); f++) {
+      if (paimanaIdRe.test(lines[f]) || lines[f].startsWith('Total (')) break
+      fwdParts.push(lines[f])
+    }
+    const fwdText = fwdParts.join(' ')
+
+    const dates = fwdText.match(/\d{2}\/\d{4}/g) || []
+    if (dates.length < 2) continue
+
+    const firstDateIdx = fwdText.search(/\d{2}\/\d{4}/)
+    const beforeDates = firstDateIdx > 0 ? fwdText.slice(0, firstDateIdx).trim() : ''
+    const agencyMatch = beforeDates.match(/\[([A-Za-z0-9&-]+)\]/)
+    const agency = agencyMatch ? agencyMatch[1] : beforeDates.split(/\s{2,}/)[0] || 'NHAI'
+    const state = agencyMatch
+      ? beforeDates.slice((agencyMatch.index || 0) + agencyMatch[0].length).trim() || 'Multi State'
+      : 'Multi State'
+
+    const afterDates = fwdText.replace(/\d{2}\/\d{4}/g, ' ')
+    const numTokens = afterDates.match(/\b\d[\d,]*(?:\.\d+)?%?\b/g) || []
+    const nums = numTokens
+      .map(t => parseFloat(t.replace(/[,%]/g, '')))
+      .filter(n => !isNaN(n))
+
+    if (nums.length >= 3) {
+      const originalCost = nums[0]
+      const expenditure = nums.length >= 4 ? nums[2] : nums[1]
+      const physPct = Math.min(100, Math.max(0, nums[nums.length - 1]))
+
+      records.push({
+        project_id: projectId,
+        project_name: projectName,
+        ministry: currentMinistry,
+        sector: currentSector,
+        implementing_agency: agency,
+        state: state || 'Multi State',
+        start_date: dates[0],
+        original_doc: dates[1],
+        original_cost_cr: originalCost,
+        expenditure_cr: expenditure,
+        physical_progress_pct: physPct,
+        snapshot_month: '2026-08',
+      })
+    }
+  }
+
+  return records
+}
+
 /**
  * Key-Value and Table Extractor for Text and Markdown reports.
  */
@@ -345,6 +484,26 @@ export function extractFromTextOrMarkdown(
         extractedRecords,
         parseWarnings,
       }
+    }
+  }
+
+  // Check for MoSPI PAIMANA Flash Report tabular rows ([PAIMANA-xxxxxx])
+  const paimanaRows = extractPaimanaFlashReportRows(text)
+  if (paimanaRows.length > 0 && !text.includes('Project ID:')) {
+    const extractedRecords: RawExtractedRecord[] = paimanaRows.map((rec, idx) => ({
+      recordIndex: idx,
+      rawFields: rec,
+      extractedTextPreview: text.slice(0, 500),
+    }))
+    return {
+      format,
+      filename,
+      fileSizeBytes: buffer.length,
+      fileHash: computeFileHash(buffer),
+      recordsDetected: extractedRecords.length,
+      projectsDetected: extractedRecords.length,
+      extractedRecords,
+      parseWarnings,
     }
   }
 

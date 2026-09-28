@@ -121,6 +121,11 @@ export class DataLabService {
     // 4. Validate canonical records
     const validationReport = validateCanonicalRecords(canonicalRecords)
 
+    // Synchronize mappingSummary with post-cleaning auto-derived PAIMANA fields
+    mappingSummary.missingRequiredCanonical = validationReport.missingRequiredFields
+    mappingSummary.mappedRequiredCount =
+      mappingSummary.totalRequiredCount - validationReport.missingRequiredFields.length
+
     const cleaningReport: CleaningReport = {
       rowsReceived: extraction.recordsDetected,
       rowsAccepted: validationReport.validRecordCount,
@@ -161,10 +166,7 @@ export class DataLabService {
           state: rec.state,
           original_cost_cr: Number(rec.original_cost_cr),
           planned_duration_months: Math.max(1, Math.round(rec.planned_duration_months)),
-          elapsed_months: Math.min(
-            Math.max(1, Math.round(rec.elapsed_months)),
-            Math.max(1, Math.round(rec.planned_duration_months))
-          ),
+          elapsed_months: Math.max(1, Math.round(rec.elapsed_months)),
           physical_progress_pct: Number(rec.physical_progress_pct),
           financial_progress_pct: Number(rec.financial_progress_pct),
           expenditure_cr: Number(rec.expenditure_cr),

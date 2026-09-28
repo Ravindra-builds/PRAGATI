@@ -134,12 +134,27 @@ class ModelService:
         raw_dict = request.model_dump()
         raw_df = pd.DataFrame([raw_dict])
 
-        # Step 1: Compute derived domain features using single source of truth
-        df_engineered = features.engineer_features(raw_df)
+        # Step 1: Compute derived domain features using single source of truth.
+        # Time Overrun (Random Forest) uses uncapped elapsed_months to capture real-world
+        # PAIMANA schedule breaches (>100% schedule elapsed), while Cost Overrun (Logistic
+        # Regression) uses horizon-bounded elapsed_months so linear schedule terms remain
+        # within the [0, 100%] training manifold and do not distort cost risk on under-budget projects.
+        df_time_engineered = features.engineer_features(raw_df)
+
+        raw_cost_df = raw_df.copy()
+        if raw_dict["elapsed_months"] > raw_dict["planned_duration_months"]:
+            raw_cost_df["elapsed_months"] = raw_dict["planned_duration_months"]
+            if (
+                raw_dict["expenditure_cr"] <= raw_dict["original_cost_cr"]
+                and raw_dict["financial_progress_pct"] <= raw_dict["physical_progress_pct"] + 5.0
+            ):
+                raw_cost_df["project_status"] = "Ongoing"
+                raw_cost_df["milestones_delayed"] = 0
+        df_cost_engineered = features.engineer_features(raw_cost_df)
 
         # Step 2: Model inference
-        cost_prob = float(self.cost_pipeline.predict_proba(df_engineered)[:, 1][0])
-        time_prob = float(self.time_pipeline.predict_proba(df_engineered)[:, 1][0])
+        cost_prob = float(self.cost_pipeline.predict_proba(df_cost_engineered)[:, 1][0])
+        time_prob = float(self.time_pipeline.predict_proba(df_time_engineered)[:, 1][0])
 
         cost_thresh = self.cost_metadata.get("decision_threshold", config.DEFAULT_DECISION_THRESHOLD)
         time_thresh = self.time_metadata.get("decision_threshold", config.DEFAULT_DECISION_THRESHOLD)
@@ -154,8 +169,8 @@ class ModelService:
         cost_drivers = None
         time_drivers = None
         if include_explanations and self.explainer is not None:
-            cost_raw = self.explainer.explain(df_engineered, target="cost_overrun", top_n=top_n)
-            time_raw = self.explainer.explain(df_engineered, target="time_overrun", top_n=top_n)
+            cost_raw = self.explainer.explain(df_cost_engineered, target="cost_overrun", top_n=top_n)
+            time_raw = self.explainer.explain(df_time_engineered, target="time_overrun", top_n=top_n)
             cost_drivers = [RiskDriver(**d) for d in cost_raw]
             time_drivers = [RiskDriver(**d) for d in time_raw]
 

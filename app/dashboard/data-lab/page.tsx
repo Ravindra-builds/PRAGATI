@@ -217,73 +217,93 @@ export const OFFICIAL_FIELD_SPECS: OfficialFieldSpec[] = [
   },
 ]
 
-// Pre-configured public infrastructure templates for 1-click evaluation
+// Pre-configured official MoSPI PAIMANA infrastructure templates (FY 2025-26 & FY 2026-27 Flash Reports)
 const SAMPLE_TEMPLATES = [
   {
-    name: 'PAIMANA National Highway Report (CSV)',
+    name: 'PAIMANA Flash Report Cohort (CSV)',
     format: 'CSV',
-    description: 'Multi-project highway telemetry with approved costs and milestone slippages',
-    content: `Project Code,Sanctioned Cost (Cr),Duration (Months),Time Elapsed,Physical Progress %,Financial %,Spent (Cr),Milestones Total,Delayed Milestones,Nodal Ministry,Sector,Executing Agency,State,Current Status,Project Title
-PRJ-PUB-101,1450.0,36,24,42.5,58.0,841.0,8,3,Ministry of Road Transport and Highways,Roads & Highways,NHAI,Maharashtra,Critical,Mumbai-Goa Highway Widening Package 3
-PRJ-PUB-102,890.0,24,14,62.0,60.5,538.4,6,1,Ministry of Road Transport and Highways,Roads & Highways,NHAI,Gujarat,Ongoing,Ahmedabad Ring Road Expansion
-PRJ-PUB-103,3200.0,48,44,78.0,91.5,2928.0,12,5,Ministry of Railways,Railways,RVNL,Odisha,Delayed,Bhubaneswar-Cuttack Quadrupling Line`,
-    filename: 'paimana_highways_sample.csv',
+    description: 'Official MoSPI PAIMANA projects (April 2025 -> 2026 backtest cohort & NHAI benchmark)',
+    content: `Project Code,Sanctioned Cost (Cr),Duration (Months),Time Elapsed,Physical Progress %,Financial %,Spent (Cr),Milestones Total,Delayed Milestones,Nodal Ministry,Sector,Executing Agency,State,Current Status,Project Title,Observation Month
+PAIMANA-400259,17237.80,66,100,96.26,100.0,20856.67,10,6,Ministry of Power,Power,NTPC,Uttar Pradesh,Critical,Ghatampur Thermal Power Project (3x660 MW) - NLCIL,2025-04
+PAIMANA-702639,10773.00,46,100,98.00,100.0,12277.63,10,5,Ministry of Housing and Urban Affairs,Urban Development,DMRC,Gujarat,Critical,Ahmedabad Metro Rail Project Phase-I (GMRCL),2025-04
+PAIMANA-701105,255.69,36,58,94.50,79.89,204.26,8,3,Ministry of Civil Aviation,Civil Aviation,AAI,Goa,Delayed,New Integrated Terminal Building at Goa Airport,2025-04
+PAIMANA-606024,1995.34,30,20,68.50,65.00,1296.97,8,0,Ministry of Road Transport and Highways,Roads & Highways,NHAI,Karnataka,Ongoing,Six-Laning of NH-275 Bengaluru-Nidaghatta Section,2026-08`,
+    filename: 'paimana_official_cohort.csv',
   },
   {
-    name: 'MoSPI Project Monitoring Snapshot (JSON)',
+    name: 'MoSPI PAIMANA Mega-Projects (JSON)',
     format: 'JSON',
-    description: 'Structured JSON telemetry matching MoSPI IPMD Common Upload Form',
+    description: 'Official August 2026 MoSPI PAIMANA Flash Report telemetry for active Metro corridors',
     content: JSON.stringify(
       {
-        reporting_period: '2025-06',
-        source: 'MoSPI IPMD Public Report',
+        reporting_period: '2026-08',
+        source: 'MoSPI PAIMANA Flash Report (August 2026)',
         projects: [
           {
-            project_id: 'PRJ-MOSPI-882',
-            project_name: 'Bengaluru Metro Phase 2A Outer Ring Road',
+            project_id: 'PAIMANA-702668',
+            project_name: 'Chennai Metro Rail Project Phase-II (CMRL)',
             ministry: 'Ministry of Housing and Urban Affairs',
-            sector: 'Urban Transport',
+            sector: 'Urban Development',
+            implementing_agency: 'CMRL',
+            state: 'Tamil Nadu',
+            original_cost: '₹ 63,246.00 Cr',
+            planned_duration_months: 72,
+            elapsed_months: 56,
+            physical_progress: '45.95 %',
+            financial_progress: '44.68 %',
+            expenditure_cr: 28257.11,
+            milestones_total: 12,
+            milestones_delayed: 4,
+            project_status: 'Delayed',
+            snapshot_month: '2026-08',
+          },
+          {
+            project_id: 'PAIMANA-702635',
+            project_name: 'Bangalore Metro Rail Project Phase-2 (BMRCL)',
+            ministry: 'Ministry of Housing and Urban Affairs',
+            sector: 'Urban Development',
             implementing_agency: 'BMRCL',
             state: 'Karnataka',
-            original_cost: '₹ 2,450.00 Cr',
-            planned_duration_months: 36,
-            elapsed_months: 30,
-            physical_progress: '51.5 %',
-            financial_progress: '72.0 %',
-            expenditure_cr: 1764.0,
-            milestones_total: 10,
-            milestones_delayed: 4,
+            original_cost: '₹ 26,405.14 Cr',
+            planned_duration_months: 61,
+            elapsed_months: 149,
+            physical_progress: '83.27 %',
+            financial_progress: '95.30 %',
+            expenditure_cr: 25163.48,
+            milestones_total: 12,
+            milestones_delayed: 7,
             project_status: 'Critical',
+            snapshot_month: '2026-08',
           },
         ],
       },
       null,
       2
     ),
-    filename: 'mospi_metro_sample.json',
+    filename: 'paimana_august2026_metro.json',
   },
   {
-    name: 'Infrastructure Inspection Dossier (Markdown)',
+    name: 'PAIMANA Greenfield Airport Dossier (MD)',
     format: 'MD',
-    description: 'Key-value inspection report from state infrastructure audit',
-    content: `# State Infrastructure Inspection Dossier
-Project ID: PRJ-AUDIT-409
-Project Name: Narmada River Aqueduct Canal Pipeline
-Ministry: Ministry of Jal Shakti
-Sector: Water Resources
-Implementing Agency: State Water Board
-State: Madhya Pradesh
-Original Cost (₹ Cr): 780.0
-Planned Duration (Months): 24
-Elapsed Months: 18
-Physical Progress (%): 55.0
-Financial Progress (%): 68.0
-Expenditure (₹ Cr): 530.4
-Milestones Total: 6
-Delayed Milestones: 2
-Status: Ongoing
-Observation Month: 2025-06`,
-    filename: 'water_pipeline_dossier.md',
+    description: 'Official MoSPI PAIMANA August 2026 inspection brief for Dholera Greenfield Airport',
+    content: `# MoSPI PAIMANA Infrastructure Inspection Dossier
+Project ID: PAIMANA-701126
+Project Name: Development of New Greenfield Airport at Dholera, Gujarat (Phase-I)
+Ministry: Ministry of Civil Aviation
+Sector: Civil Aviation
+Implementing Agency: Airport Authority of India [AAI]
+State: Gujarat
+Original Cost (₹ Cr): 1305.00
+Planned Duration (Months): 41
+Elapsed Months: 45
+Physical Progress (%): 93.83
+Financial Progress (%): 80.27
+Expenditure (₹ Cr): 1047.55
+Milestones Total: 10
+Delayed Milestones: 3
+Status: Delayed
+Observation Month: 2026-08`,
+    filename: 'paimana_dholera_airport_dossier.md',
   },
 ]
 
