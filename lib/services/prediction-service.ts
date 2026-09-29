@@ -112,6 +112,17 @@ export class PredictionService {
         }
       )
 
+      // Resolve any prior active warnings for this project so duplicate rules do not accumulate
+      await tx.earlyWarning.updateMany({
+        where: {
+          projectId: project.projectId,
+          resolvedAt: null,
+        },
+        data: {
+          resolvedAt: new Date(),
+        },
+      })
+
       // Store warnings if any triggered
       const createdWarnings = []
       for (const w of warningCandidates) {

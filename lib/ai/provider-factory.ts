@@ -8,20 +8,25 @@ import { GeminiProvider } from './providers/gemini-provider'
 import { OpenAIProvider } from './providers/openai-provider'
 
 export class ProviderFactory {
-  private static cachedProvider: LLMProvider | null = null
-
   static getProvider(override?: string): LLMProvider {
-    const providerName = (override || process.env.LLM_PROVIDER || '').toLowerCase().trim()
+    const explicitOverride = (override || '').toLowerCase().trim()
+    if (explicitOverride === 'mock') {
+      return new MockGroundedProvider()
+    }
 
-    if (providerName === 'gemini' || (!providerName && process.env.GEMINI_API_KEY)) {
+    const providerName = (explicitOverride || process.env.LLM_PROVIDER || '').toLowerCase().trim()
+    const hasGeminiKey = Boolean((process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim())
+    const hasOpenAIKey = Boolean((process.env.OPENAI_API_KEY || '').trim())
+
+    if (providerName === 'gemini' || hasGeminiKey) {
       return new GeminiProvider()
     }
 
-    if (providerName === 'openai' || (!providerName && process.env.OPENAI_API_KEY)) {
+    if (providerName === 'openai' || hasOpenAIKey) {
       return new OpenAIProvider()
     }
 
-    // Default to deterministic grounded offline mock provider
+    // Default to deterministic grounded offline mock provider when no API keys are present
     return new MockGroundedProvider()
   }
 }

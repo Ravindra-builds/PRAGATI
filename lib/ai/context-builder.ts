@@ -197,7 +197,7 @@ export class ContextBuilder {
   /**
    * Builds grounded portfolio-level context.
    */
-  static async buildPortfolioContext(): Promise<GroundedPortfolioContext> {
+  static async buildPortfolioContext(userQuery?: string): Promise<GroundedPortfolioContext> {
     const analytics = await projectService.getAnalyticsData()
     const summary = await projectService.getDashboardSummary()
     const alertsData = await projectService.getAlerts({ limit: 10 })
@@ -234,7 +234,7 @@ export class ContextBuilder {
       (analytics as unknown as { sectors?: typeof analytics.bySector })?.sectors ||
       []
 
-    const topRiskSectors = rawSectors
+    const topRiskSectors = [...rawSectors]
       .sort((a, b) => b.critical + b.high - (a.critical + a.high))
       .slice(0, 6)
       .map((s) => ({
@@ -243,6 +243,69 @@ export class ContextBuilder {
         high_or_critical_count: s.critical + s.high,
         avg_cost_risk: s.avgCostRisk,
         avg_time_risk: s.avgTimeRisk,
+      }))
+
+    const topRiskStates = [...(analytics.byState || [])]
+      .sort((a, b) => b.critical + b.high - (a.critical + a.high))
+      .slice(0, 8)
+      .map((st) => ({
+        state: st.state,
+        total_projects: st.totalProjects,
+        high_or_critical_count: st.critical + st.high,
+        avg_cost_risk: st.avgCostRisk,
+        avg_time_risk: st.avgTimeRisk,
+        avg_burn_gap: st.avgBurnGap,
+      }))
+
+    const scatterPoints = analytics.scatterPoints || []
+    const topBurnGapProjects = [...scatterPoints]
+      .sort((a, b) => b.burnGap - a.burnGap)
+      .slice(0, 6)
+      .map((sp) => ({
+        project_id: sp.projectId,
+        name: sp.name,
+        sector: sp.sector,
+        state: sp.state,
+        financial_progress_pct: sp.financialProgressPct,
+        physical_progress_pct: sp.physicalProgressPct,
+        burn_gap: sp.burnGap,
+        cost_overrun_probability: sp.costOverrunProbability,
+        overall_risk_level: sp.overallRiskLevel,
+      }))
+
+    const qLower = (userQuery || '').toLowerCase()
+    const sectorMatched = [...scatterPoints]
+      .filter((sp) => {
+        if (qLower.includes('rail') || qLower.includes('road') || qLower.includes('highway')) {
+          return (
+            sp.sector.toLowerCase().includes('rail') ||
+            sp.sector.toLowerCase().includes('road') ||
+            sp.sector.toLowerCase().includes('highway')
+          )
+        }
+        if (qLower.includes('power') || qLower.includes('energy')) {
+          return sp.sector.toLowerCase().includes('power') || sp.sector.toLowerCase().includes('energy')
+        }
+        if (qLower.includes('urban') || qLower.includes('metro')) {
+          return sp.sector.toLowerCase().includes('urban')
+        }
+        if (qLower.includes('water')) {
+          return sp.sector.toLowerCase().includes('water')
+        }
+        return sp.overallRiskLevel === 'CRITICAL' || sp.overallRiskLevel === 'HIGH'
+      })
+      .sort((a, b) => b.costOverrunProbability + b.timeOverrunProbability - (a.costOverrunProbability + a.timeOverrunProbability))
+      .slice(0, 6)
+      .map((sp) => ({
+        project_id: sp.projectId,
+        name: sp.name,
+        sector: sp.sector,
+        state: sp.state,
+        cost_overrun_probability: sp.costOverrunProbability,
+        time_overrun_probability: sp.timeOverrunProbability,
+        overall_risk_level: sp.overallRiskLevel,
+        burn_gap: sp.burnGap,
+        milestone_slippage_pct: Math.max(0, sp.scheduleProgressGap),
       }))
 
     const commonTypes = Object.entries(alertsData.summary?.byType || {}).map(([type, count]) => ({
@@ -261,6 +324,9 @@ export class ContextBuilder {
       },
       high_priority_projects: highPriorityProjects,
       top_risk_sectors: topRiskSectors,
+      top_risk_states: topRiskStates,
+      top_burn_gap_projects: topBurnGapProjects,
+      sector_highlights: sectorMatched,
       warning_summary: {
         total_active_warnings: alertsData.summary?.total || 0,
         critical_warnings: alertsData.summary?.critical || 0,
@@ -326,7 +392,7 @@ export class ContextBuilder {
     const isPortfolio = portfolioKeywords.some((k) => lower.includes(k)) || !targetProjectId
 
     if (isPortfolio) {
-      const portfolioContext = await this.buildPortfolioContext()
+      const portfolioContext = await this.buildPortfolioContext(message)
       return {
         type: 'PORTFOLIO',
         data: portfolioContext,

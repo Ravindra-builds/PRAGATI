@@ -15,8 +15,9 @@ export class GeminiProvider implements LLMProvider {
   private model: string
 
   constructor(apiKey?: string, model?: string) {
-    this.apiKey = apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || ''
-    this.model = model || process.env.LLM_MODEL || 'gemini-2.5-flash'
+    this.apiKey = (apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim()
+    const rawModel = (model || process.env.LLM_MODEL || 'gemini-2.5-flash').trim()
+    this.model = rawModel.startsWith('gemini-1.5') ? 'gemini-2.5-flash' : rawModel
   }
 
   async generateResponse(
@@ -35,6 +36,7 @@ export class GeminiProvider implements LLMProvider {
 
     if (history && history.length > 0) {
       for (const msg of history.slice(-4)) {
+        if (!msg.content?.trim()) continue
         contents.push({
           role: msg.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: msg.content }],
@@ -58,8 +60,8 @@ export class GeminiProvider implements LLMProvider {
         },
         contents,
         generationConfig: {
-          temperature: 0.2,
-          response_mime_type: 'application/json',
+          temperature: 0.25,
+          responseMimeType: 'application/json',
         },
       }),
     })
@@ -70,7 +72,11 @@ export class GeminiProvider implements LLMProvider {
     }
 
     const data = await res.json()
-    const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const parts = data?.candidates?.[0]?.content?.parts || []
+    const textOutput = parts
+      .map((p: { text?: string }) => p.text || '')
+      .join('\n')
+      .trim()
 
     return this.parseResponse(textOutput, context)
   }
@@ -79,9 +85,18 @@ export class GeminiProvider implements LLMProvider {
     try {
       const cleaned = text
         .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
         .replace(/\s*```$/i, '')
         .trim()
-      const parsed = JSON.parse(cleaned)
+
+      const firstBrace = cleaned.indexOf('{')
+      const lastBrace = cleaned.lastIndexOf('}')
+      const jsonCandidate =
+        firstBrace !== -1 && lastBrace > firstBrace
+          ? cleaned.slice(firstBrace, lastBrace + 1)
+          : cleaned
+
+      const parsed = JSON.parse(jsonCandidate)
 
       return {
         answer: String(parsed.answer || ''),
@@ -94,7 +109,7 @@ export class GeminiProvider implements LLMProvider {
       }
     } catch {
       return {
-        answer: text.slice(0, 500),
+        answer: text.slice(0, 800),
         evidence: ['Extracted from direct application context.'],
         model_signals: ['Dual-target ML risk inference verified.'],
         recommendations: ['Review project indicators and schedule dependencies.'],

@@ -95,6 +95,36 @@ export interface GroundedPortfolioContext {
     avg_cost_risk: number
     avg_time_risk: number
   }>
+  top_risk_states?: Array<{
+    state: string
+    total_projects: number
+    high_or_critical_count: number
+    avg_cost_risk: number
+    avg_time_risk: number
+    avg_burn_gap: number
+  }>
+  top_burn_gap_projects?: Array<{
+    project_id: string
+    name: string
+    sector: string
+    state: string
+    financial_progress_pct: number
+    physical_progress_pct: number
+    burn_gap: number
+    cost_overrun_probability: number
+    overall_risk_level: string
+  }>
+  sector_highlights?: Array<{
+    project_id: string
+    name: string
+    sector: string
+    state: string
+    cost_overrun_probability: number
+    time_overrun_probability: number
+    overall_risk_level: string
+    burn_gap: number
+    milestone_slippage_pct: number
+  }>
   warning_summary: {
     total_active_warnings: number
     critical_warnings: number

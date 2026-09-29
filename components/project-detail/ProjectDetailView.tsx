@@ -609,57 +609,241 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       {/* SHAP Risk Drivers Panel */}
       <RiskDriversPanel drivers={latestDrivers} />
 
-      {/* Active Early Warning Alerts */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-              Active Early Warnings &amp; Advisory Signals
-            </h3>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono font-semibold">
-              {project.warnings ? project.warnings.length : 0} Triggered
-            </span>
-            <Link
-              href={`/dashboard/alerts?projectId=${project.projectId}`}
-              className="text-xs font-semibold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 hover:underline"
-            >
-              <span>View in Alerts Center</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
+      {/* Active Early Warning Alerts (Deduplicated by Rule with Full Project Telemetry Context) */}
+      {(() => {
+        const seenTypes = new Set<string>()
+        const uniqueWarnings = (project.warnings || []).filter((w) => {
+          if (seenTypes.has(w.warningType)) return false
+          seenTypes.add(w.warningType)
+          return true
+        })
 
-        {project.warnings && project.warnings.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
-            {project.warnings.map((w) => (
-              <div
-                key={w.id}
-                className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5 hover:bg-slate-100/60 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-xs font-bold text-slate-900 leading-snug">{w.title}</h4>
-                  <RiskBadge level={w.severity as RiskTier} size="sm" />
+        const getRuleDetails = (warningType: string) => {
+          switch (warningType) {
+            case 'COST_OVERRUN_RISK':
+              return {
+                category: 'ML Cost Model Signal',
+                badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
+                metrics: [
+                  {
+                    label: 'Predicted Overrun Prob',
+                    value: `${(costProb * 100).toFixed(1)}%`,
+                    sub: 'Threshold: ≥ 50.0%',
+                    highlight: 'text-rose-600',
+                  },
+                  {
+                    label: 'Sanctioned vs Spent',
+                    value: `₹${(latestUpdate?.expenditureCr ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 1 })} / ₹${project.originalCostCr.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr`,
+                    sub: `${finPct.toFixed(1)}% utilized`,
+                    highlight: 'text-slate-900',
+                  },
+                  {
+                    label: 'Physical Delivery',
+                    value: `${phyPct.toFixed(1)}%`,
+                    sub: `Burn Gap: ${burnGap > 0 ? '+' : ''}${burnGap.toFixed(1)}%`,
+                    highlight: burnGap >= 15 ? 'text-rose-600' : 'text-emerald-700',
+                  },
+                ],
+                action: `Audit contractor Running Account (RA) bills with ${project.implementingAgency} against verified site completion before releasing the next financial tranche.`,
+              }
+            case 'SCHEDULE_DELAY_RISK':
+              return {
+                category: 'ML Schedule Model Signal',
+                badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
+                metrics: [
+                  {
+                    label: 'Predicted Delay Prob',
+                    value: `${(timeProb * 100).toFixed(1)}%`,
+                    sub: 'Threshold: ≥ 50.0%',
+                    highlight: 'text-amber-600',
+                  },
+                  {
+                    label: 'Time Elapsed vs Planned',
+                    value: `${elapsedMonths} of ${plannedMonths} Mos`,
+                    sub: `${elapsedRatio}% duration elapsed`,
+                    highlight: elapsedRatio >= 85 ? 'text-rose-600' : 'text-slate-900',
+                  },
+                  {
+                    label: 'Remaining Workload',
+                    value: `${Math.max(0, 100 - phyPct).toFixed(1)}% Work Left`,
+                    sub: `${Math.max(0, plannedMonths - elapsedMonths)} mos remaining`,
+                    highlight: 'text-slate-900',
+                  },
+                ],
+                action: `Convene schedule recovery review with ${project.implementingAgency} (${project.state}) to fast-track critical-path bottlenecks and revise milestone targets.`,
+              }
+            case 'EXPENDITURE_BURN_ANOMALY':
+              return {
+                category: 'Financial Burn Anomaly',
+                badgeColor: 'bg-orange-50 text-orange-800 border-orange-200',
+                metrics: [
+                  {
+                    label: 'Expenditure-Physical Gap',
+                    value: `${burnGap > 0 ? '+' : ''}${burnGap.toFixed(1)}%`,
+                    sub: 'Threshold: ≥ +15.0%',
+                    highlight: 'text-rose-600',
+                  },
+                  {
+                    label: 'Financial Utilization',
+                    value: `${finPct.toFixed(1)}%`,
+                    sub: `₹${(latestUpdate?.expenditureCr ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr spent`,
+                    highlight: 'text-blue-700',
+                  },
+                  {
+                    label: 'On-Ground Physical',
+                    value: `${phyPct.toFixed(1)}%`,
+                    sub: `Snapshot: ${latestUpdate?.snapshotMonth || 'Latest'}`,
+                    highlight: 'text-emerald-700',
+                  },
+                ],
+                action: `Verify Utilization Certificates (UCs) and pause non-milestone-linked mobilization advances until physical progress reconciles with disbursement.`,
+              }
+            case 'CRITICAL_MILESTONE_SLIPPAGE':
+            default:
+              return {
+                category: 'Milestone Execution Bottleneck',
+                badgeColor: 'bg-purple-50 text-purple-800 border-purple-200',
+                metrics: [
+                  {
+                    label: 'Milestone Slippage Rate',
+                    value: `${slippageRatio}% Delayed`,
+                    sub: 'Threshold: ≥ 30% Delayed',
+                    highlight: 'text-rose-600',
+                  },
+                  {
+                    label: 'Delayed Milestones',
+                    value: `${milestonesDelayed} of ${milestonesTotal}`,
+                    sub: `${Math.max(0, milestonesTotal - milestonesDelayed)} on track`,
+                    highlight: 'text-slate-900',
+                  },
+                  {
+                    label: 'Execution Status',
+                    value: latestUpdate?.projectStatus || project.status,
+                    sub: `Agency: ${project.implementingAgency}`,
+                    highlight: 'text-slate-800',
+                  },
+                ],
+                action: `Escalate pending Right-of-Way (RoW), utility shifting, or statutory clearance dependencies in ${project.state} to the PRAGATI nodal officer.`,
+              }
+          }
+        }
+
+        return (
+          <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                    Active Early Warnings &amp; Diagnostic Advisories
+                  </h3>
                 </div>
-                <div className="font-mono text-[10px] uppercase font-semibold text-slate-400">
-                  Rule: {w.warningType}
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">{w.message}</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Deduplicated active risk rules triggered for <strong>{project.projectId}</strong> ({project.name}) at snapshot{' '}
+                  <strong className="font-mono">{latestUpdate?.snapshotMonth || 'Latest'}</strong>, showing exact metric thresholds and recommended officer actions.
+                </p>
               </div>
-            ))}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span className="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 font-mono font-semibold">
+                  {uniqueWarnings.length} Active {uniqueWarnings.length === 1 ? 'Rule' : 'Rules'}
+                </span>
+                <Link
+                  href={`/dashboard/alerts?projectId=${project.projectId}`}
+                  className="text-xs font-semibold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 hover:underline"
+                >
+                  <span>View in Alerts Center</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {uniqueWarnings.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {uniqueWarnings.map((w) => {
+                  const details = getRuleDetails(w.warningType)
+                  return (
+                    <div
+                      key={w.warningType}
+                      className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/90 space-y-3 hover:border-slate-300 transition-colors flex flex-col justify-between"
+                    >
+                      <div className="space-y-2.5">
+                        {/* Top Title & Severity */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${details.badgeColor}`}
+                              >
+                                {details.category}
+                              </span>
+                              <span className="font-mono text-[10px] font-semibold text-slate-400">
+                                {w.warningType}
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                              {w.title}
+                            </h4>
+                          </div>
+                          <RiskBadge level={w.severity as RiskTier} size="sm" />
+                        </div>
+
+                        {/* Project Context Pill */}
+                        <div className="text-[11px] text-slate-500 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+                          <span className="truncate">
+                            <strong className="font-mono text-slate-800">{project.projectId}</strong> &bull;{' '}
+                            {project.implementingAgency} ({project.state})
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-500 shrink-0">
+                            Snapshot: {latestUpdate?.snapshotMonth || 'Latest'}
+                          </span>
+                        </div>
+
+                        {/* 3-Column Concrete Telemetry vs Threshold Breakdown */}
+                        <div className="grid grid-cols-3 gap-2">
+                          {details.metrics.map((m) => (
+                            <div
+                              key={m.label}
+                              className="bg-white p-2 rounded-lg border border-slate-200/80 space-y-0.5"
+                            >
+                              <div className="text-[10px] text-slate-400 font-medium truncate">
+                                {m.label}
+                              </div>
+                              <div className={`text-xs font-bold font-mono truncate ${m.highlight}`}>
+                                {m.value}
+                              </div>
+                              <div className="text-[10px] text-slate-500 truncate">{m.sub}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Diagnostic Message */}
+                        <p className="text-xs text-slate-700 leading-relaxed">{w.message}</p>
+                      </div>
+
+                      {/* Actionable Review Recommendation */}
+                      <div className="pt-2.5 border-t border-slate-200/80 flex items-start gap-2 text-[11px] text-slate-700">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold text-slate-900">Recommended Officer Action: </span>
+                          <span>{details.action}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="p-5 bg-slate-50 rounded-lg border border-slate-200 text-center flex flex-col items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 mb-1.5" />
+                <p className="text-xs font-semibold text-slate-700">No Active Anomalies Detected</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Project indicators are progressing within expected contractual tolerances.
+                </p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="p-5 bg-slate-50 rounded-lg border border-slate-200 text-center flex flex-col items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 mb-1.5" />
-            <p className="text-xs font-semibold text-slate-700">No Active Anomalies Detected</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Project indicators are progressing within expected contractual tolerances.
-            </p>
-          </div>
-        )}
-      </div>
+        )
+      })()}
 
       {/* Snapshot History Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">

@@ -103,7 +103,7 @@ export function FloatingChatBot() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          activeProjectId: detectedProjectId,
+          projectId: detectedProjectId,
           conversationId: conversationId || undefined,
         }),
       })

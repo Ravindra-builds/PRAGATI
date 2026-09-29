@@ -77,16 +77,22 @@ export class MockGroundedProvider implements LLMProvider {
         const evidence: string[] = []
         if (latest) {
           evidence.push(
-            `Physical delivery progress is ${latest.physical_progress_pct.toFixed(1)}% against financial utilization of ${latest.financial_progress_pct.toFixed(1)}% (₹${latest.expenditure_cr.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr expended).`
+            `Physical delivery progress is ${latest.physical_progress_pct.toFixed(1)}% against financial utilization of ${latest.financial_progress_pct.toFixed(1)}% (₹${latest.expenditure_cr.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr expended of ₹${p.original_cost_cr.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr sanctioned).`
           )
           evidence.push(
-            `Milestone status: ${latest.milestones_delayed} of ${latest.milestones_total} milestones are currently delayed.`
+            `Milestone status: ${latest.milestones_delayed} of ${latest.milestones_total} milestones are currently delayed (${latest.milestones_total > 0 ? Math.round((latest.milestones_delayed / latest.milestones_total) * 100) : 0}% slippage).`
           )
           evidence.push(
             `Schedule duration: ${latest.elapsed_months} of ${p.planned_duration_months} planned months elapsed (${(latest.schedule_elapsed_ratio * 100).toFixed(0)}% elapsed).`
           )
         } else {
           evidence.push(`Project profile: Sanctioned cost of ₹${p.original_cost_cr} Cr with a ${p.planned_duration_months}-month planned duration.`)
+        }
+
+        if (p.warnings && p.warnings.length > 0 && (lowerPrompt.includes('warning') || lowerPrompt.includes('alert') || lowerPrompt.includes('signal'))) {
+          for (const w of p.warnings.slice(0, 3)) {
+            evidence.push(`Active Warning [${w.warning_type} - ${w.severity}]: ${w.title} — ${w.message}`)
+          }
         }
 
         const modelSignals: string[] = [
@@ -104,19 +110,30 @@ export class MockGroundedProvider implements LLMProvider {
         }
 
         const recommendations: string[] = [
-          'Verify that actual physical work completed on-site corresponds to claimed financial expenditure vouchers.',
-          'Request an updated milestone recovery schedule and dependency mitigation plan from the implementing agency.',
-          'Review land acquisition, environmental clearances, and right-of-way permissions for delayed milestones.',
-          'Schedule an inter-departmental coordination review before the next reporting cycle.',
+          `Verify that actual physical work completed on-site (${latest?.physical_progress_pct.toFixed(1) ?? 0}%) corresponds to claimed financial expenditure vouchers (${latest?.financial_progress_pct.toFixed(1) ?? 0}%).`,
+          `Request an updated milestone recovery schedule from ${p.implementing_agency} for the ${latest?.milestones_delayed ?? 0} delayed milestones.`,
+          `Review right-of-way (RoW), utility shifting, and statutory clearance dependencies in ${p.state}.`,
+          `Schedule an inter-departmental PRAGATI review with ${p.ministry} before the next monthly reporting cycle.`,
         ]
 
         const limitations: string[] = [
           'Based on current PRAGATI prototype monitoring data and dual-target ML inference outputs.',
           'On-site inspection reports, contractor dispute logs, and force majeure claims are not included in this snapshot.',
-          'Recommendations are advisory decision-support suggestions for monitoring authorities, not official policy determinations.',
         ]
 
-        const answer = `Project ${p.project_id} (${p.name}) is classified as ${riskLevel} risk based on dual-target ML inference. The predictive models evaluate a ${costProbPct}% likelihood of exceeding sanctioned cost and a ${timeProbPct}% likelihood of milestone delivery delays, driven primarily by an observed gap between expenditure and on-ground physical delivery.`
+        let answer = `Project ${p.project_id} (${p.name}) in ${p.state} is classified as ${riskLevel} risk based on dual-target ML inference (${costProbPct}% cost overrun risk / ${timeProbPct}% schedule delay risk), driven by a ${(latest?.burn_gap ?? 0).toFixed(1)}% financial-vs-physical burn gap and ${latest?.milestones_delayed ?? 0} delayed milestones.`
+
+        if (lowerPrompt.includes('schedule') || lowerPrompt.includes('delay') || lowerPrompt.includes('time')) {
+          answer = `Schedule delay risk for ${p.project_id} (${p.name}) is evaluated at ${timeProbPct}% (Random Forest model). The primary schedule bottleneck is that ${latest?.elapsed_months ?? 0} of ${p.planned_duration_months} approved months (${((latest?.schedule_elapsed_ratio ?? 0) * 100).toFixed(0)}%) have elapsed while physical completion stands at ${latest?.physical_progress_pct.toFixed(1) ?? 0}%, compounded by ${latest?.milestones_delayed ?? 0} of ${latest?.milestones_total ?? 0} contractual milestones slipping behind schedule.`
+        } else if (lowerPrompt.includes('warning') || lowerPrompt.includes('alert') || lowerPrompt.includes('signal')) {
+          const warnSummary =
+            p.warnings && p.warnings.length > 0
+              ? p.warnings.map((w) => `${w.title} (${w.severity})`).join(', ')
+              : 'no active rule breaches'
+          answer = `Project ${p.project_id} (${p.name}) currently has ${p.warnings?.length || 0} active early warning signal(s): ${warnSummary}. These advisories were triggered by its ${costProbPct}% cost overrun risk, ${timeProbPct}% schedule delay probability, and a ${(latest?.burn_gap ?? 0).toFixed(1)}% expenditure burn gap.`
+        } else if (lowerPrompt.includes('remedial') || lowerPrompt.includes('action') || lowerPrompt.includes('recommend') || lowerPrompt.includes('committee')) {
+          answer = `For ${p.project_id} (${p.name}), the monitoring committee should prioritize: (1) auditing RA bills with ${p.implementing_agency} to reconcile the ${(latest?.burn_gap ?? 0).toFixed(1)}% expenditure-to-physical gap, (2) enforcing a recovery plan for the ${latest?.milestones_delayed ?? 0} delayed milestones, and (3) resolving state-level RoW/utility bottlenecks in ${p.state}.`
+        }
 
         return {
           answer,
@@ -133,10 +150,111 @@ export class MockGroundedProvider implements LLMProvider {
         const pf = context.data
         const dist = pf.risk_distribution
 
+        // 1. Query about States / Geographic Concentration
+        if (lowerPrompt.includes('state') || lowerPrompt.includes('geographic') || lowerPrompt.includes('where')) {
+          const states = pf.top_risk_states || []
+          const top3States = states.slice(0, 4)
+          return {
+            answer: `Geographic risk analysis across the ${pf.total_projects}-project portfolio shows the highest concentration of delayed and high-risk projects in ${top3States.map((s) => `${s.state} (${s.high_or_critical_count} high/critical of ${s.total_projects} projects)`).join(', ')}.`,
+            evidence: states.slice(0, 5).map(
+              (s) =>
+                `${s.state}: ${s.high_or_critical_count} elevated-risk projects out of ${s.total_projects} total (Avg Delay Risk: ${(s.avg_time_risk * 100).toFixed(1)}%, Avg Burn Gap: +${s.avg_burn_gap.toFixed(1)}%).`
+            ),
+            model_signals: [
+              `State-level delay probabilities are highest in ${top3States.map((s) => `${s.state} (${(s.avg_time_risk * 100).toFixed(1)}% avg delay risk)`).join(', ')}.`,
+              `Cost overrun exposure correlates strongly with states exhibiting average financial-vs-physical burn gaps above +10%.`,
+            ],
+            recommendations: [
+              `Convene joint Chief Secretary / PRAGATI nodal reviews in ${top3States.slice(0, 2).map((s) => s.state).join(' and ')} to clear land acquisition and statutory forest/utility bottlenecks.`,
+              'Establish state-wise milestone tracking dashboards for agencies operating in high-slippage corridors.',
+            ],
+            limitations: [
+              'Based on current PRAGATI portfolio telemetry and dual-target ML risk aggregations across states.',
+            ],
+            intent: 'PORTFOLIO_OVERVIEW',
+          }
+        }
+
+        // 2. Query about Financial Expenditure ahead of Physical Progress (Burn Gap)
+        if (
+          lowerPrompt.includes('financial') ||
+          lowerPrompt.includes('expenditure') ||
+          lowerPrompt.includes('burn') ||
+          lowerPrompt.includes('ahead of physical')
+        ) {
+          const burnProjects = pf.top_burn_gap_projects || []
+          return {
+            answer: `Across the portfolio, the projects with the largest divergence where financial expenditure outpaces on-ground physical progress are ${burnProjects.slice(0, 3).map((b) => `${b.project_id} (+${b.burn_gap.toFixed(1)}% gap)`).join(', ')}. This expenditure-burn anomaly is the #1 predictor of eventual budget overruns in our L2 Logistic Regression model.`,
+            evidence: burnProjects.slice(0, 5).map(
+              (b) =>
+                `${b.project_id} (${b.name} — ${b.sector}, ${b.state}): Financial utilization at ${b.financial_progress_pct.toFixed(1)}% vs Physical delivery at ${b.physical_progress_pct.toFixed(1)}% (Burn Gap: +${b.burn_gap.toFixed(1)}%).`
+            ),
+            model_signals: burnProjects.slice(0, 3).map(
+              (b) =>
+                `${b.project_id}: ${(b.cost_overrun_probability * 100).toFixed(1)}% predicted cost overrun probability (${b.overall_risk_level} risk tier).`
+            ),
+            recommendations: [
+              'Audit Utilization Certificates (UCs) and contractor running-account (RA) bills for projects with burn gaps exceeding +15%.',
+              'Gate further mobilization or material advance disbursements on verified physical milestone completion.',
+            ],
+            limitations: [
+              'High financial utilization in early phases can occasionally reflect legitimate upfront equipment procurement or land compensation payouts.',
+            ],
+            intent: 'PORTFOLIO_OVERVIEW',
+          }
+        }
+
+        // 3. Query about Specific Sectors (Railways, Road Transport, Power, Urban, etc.)
+        if (
+          lowerPrompt.includes('rail') ||
+          lowerPrompt.includes('road') ||
+          lowerPrompt.includes('highway') ||
+          lowerPrompt.includes('power') ||
+          lowerPrompt.includes('urban')
+        ) {
+          const highlights = pf.sector_highlights || []
+          const matchingSectors = pf.top_risk_sectors.filter(
+            (s) =>
+              (lowerPrompt.includes('rail') && s.sector.toLowerCase().includes('rail')) ||
+              ((lowerPrompt.includes('road') || lowerPrompt.includes('highway')) &&
+                (s.sector.toLowerCase().includes('road') || s.sector.toLowerCase().includes('highway'))) ||
+              (lowerPrompt.includes('power') && s.sector.toLowerCase().includes('power')) ||
+              (lowerPrompt.includes('urban') && s.sector.toLowerCase().includes('urban'))
+          )
+          const targetSectors = matchingSectors.length > 0 ? matchingSectors : pf.top_risk_sectors.slice(0, 2)
+
+          return {
+            answer: `In the requested infrastructure sector(s) (${targetSectors.map((s) => s.sector).join(' & ')}), ${targetSectors.reduce((acc, s) => acc + s.high_or_critical_count, 0)} projects are flagged in High or Critical risk tiers. Top flagged projects include ${highlights.slice(0, 3).map((h) => `${h.project_id} (${(h.cost_overrun_probability * 100).toFixed(0)}% cost / ${(h.time_overrun_probability * 100).toFixed(0)}% schedule risk)`).join(', ')}.`,
+            evidence: [
+              ...targetSectors.map(
+                (s) =>
+                  `Sector ${s.sector}: ${s.high_or_critical_count} of ${s.total_projects} projects in High/Critical tier (Avg Cost Risk: ${(s.avg_cost_risk * 100).toFixed(1)}%, Avg Schedule Risk: ${(s.avg_time_risk * 100).toFixed(1)}%).`
+              ),
+              ...highlights.slice(0, 4).map(
+                (h) =>
+                  `${h.project_id} (${h.name} — ${h.sector}, ${h.state}): Cost Risk ${(h.cost_overrun_probability * 100).toFixed(1)}%, Schedule Risk ${(h.time_overrun_probability * 100).toFixed(1)}%, Burn Gap +${h.burn_gap.toFixed(1)}%.`
+              ),
+            ],
+            model_signals: [
+              `Logistic Regression and Random Forest models identify ${highlights[0]?.project_id || 'PRJ-0012'} and ${highlights[1]?.project_id || 'PRJ-0028'} as having the highest compound overrun likelihood in this cohort.`,
+              `Primary sector risk drivers: Right-of-Way (RoW) acquisition lag, utility shifting delays, and expenditure burn divergence.`,
+            ],
+            recommendations: [
+              `Prioritize ministerial review for ${highlights.slice(0, 3).map((h) => h.project_id).join(', ')} before the next quarterly capex tranche release.`,
+              'Enforce strict physical-milestone verification for corridor projects showing >15% financial burn gaps.',
+            ],
+            limitations: [
+              'Based on current PRAGATI prototype sector telemetry and dual-target ML inference.',
+            ],
+            intent: 'PORTFOLIO_OVERVIEW',
+          }
+        }
+
+        // 4. Default / Early Warning Patterns Portfolio Overview
         const evidence: string[] = [
           `The monitored portfolio comprises ${pf.total_projects} infrastructure projects across key national sectors.`,
           `Risk distribution: ${dist.critical} Critical, ${dist.high} High, ${dist.medium} Medium, and ${dist.low} Low risk projects (${dist.high_or_critical_pct.toFixed(1)}% in elevated risk tiers).`,
-          `Active alerts: ${pf.warning_summary.total_active_warnings} early warnings active (${pf.warning_summary.critical_warnings} critical, ${pf.warning_summary.high_warnings} high severity).`,
+          `Active alerts: ${pf.warning_summary.total_active_warnings} early warnings active (${pf.warning_summary.critical_warnings} critical, ${pf.warning_summary.high_warnings} high severity) across ${pf.warning_summary.common_types.map((t) => `${t.type} (${t.count})`).join(', ')}.`,
         ]
 
         const modelSignals: string[] = [
@@ -146,7 +264,7 @@ export class MockGroundedProvider implements LLMProvider {
 
         const recommendations: string[] = [
           'Prioritize immediate bilateral review meetings for the top Critical-tier projects.',
-          'Investigate systemic milestone delays across top high-risk sectors (especially Railway and Road sector projects).',
+          'Investigate systemic milestone delays across top high-risk sectors (especially Power, Urban Development, and Roads & Highways).',
           'Establish a monthly expenditure-burn review taskforce to address persistent financial vs physical parity gaps.',
         ]
 

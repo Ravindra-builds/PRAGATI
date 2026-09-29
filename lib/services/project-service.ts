@@ -239,7 +239,7 @@ export class ProjectService {
               ]
             : []
 
-        const warnings =
+        const rawWarnings =
           project.warnings.length > 0
             ? project.warnings
             : synth?.warnings
@@ -251,11 +251,31 @@ export class ProjectService {
               }))
             : []
 
+        // Deduplicate active warnings by warningType (keeping the latest record per rule)
+        const seenRules = new Set<string>()
+        const deduplicatedWarnings = []
+        for (const w of rawWarnings) {
+          if (!seenRules.has(w.warningType)) {
+            seenRules.add(w.warningType)
+            deduplicatedWarnings.push(w)
+          }
+        }
+
+        const severityRank: Record<string, number> = {
+          CRITICAL: 4,
+          HIGH: 3,
+          MEDIUM: 2,
+          LOW: 1,
+        }
+        deduplicatedWarnings.sort(
+          (a, b) => (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0)
+        )
+
         return {
           ...project,
           updates: sortedUpdates,
           predictions,
-          warnings,
+          warnings: deduplicatedWarnings,
         }
       }
 
