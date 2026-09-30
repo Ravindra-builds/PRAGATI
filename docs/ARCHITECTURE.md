@@ -10,27 +10,29 @@ This document details the architectural layers, system boundaries, data contract
                              BROWSER / CLIENT
                                     │
                                     ▼
-                         Next.js App Router (UI)
-                 [Dashboard, Alerts, Analytics, Project Detail,
-                     PRAGATI Intelligence Assistant]
+                        Next.js 16 App Router (UI)
+          [Dashboard • Projects & India Map • Project Dossier •
+           Portfolio Analytics • Alerts • Data Lab • AI Assistant]
                                     │
                                     ▼
-                         Next.js Backend API Layer
-              [app/api/projects/..., app/api/assistant/chat]
+                        Next.js Backend API Layer
+          [app/api/projects/..., app/api/data-lab/..., app/api/assistant/chat]
                                     │
            ┌────────────────────────┼────────────────────────┐
            │                        │                        │
            ▼                        ▼                        ▼
-Application Database (PostgreSQL) FastAPI ML Inference     LLM Provider Layer
-    [Prisma ORM Client]          Service [ml/api/main.py]  [Gemini / OpenAI / Mock]
-           │                        │                        │
-    ┌──────┴──────┐                 ▼                        │
-    ▼             ▼          Saved Model Pipelines           │
- projects  project_updates   - Cost Overrun (Logistic Reg)   │
-    │             │          - Time Overrun (Random Forest)  │
-    └──────┬──────┘                 │                        │
-           ▼                        ▼                        ▼
-  predictions & warnings    SHAP Feature Drivers    ContextBuilder & Grounding
+Application Database      Hybrid Dual-Target ML     LLM Intelligence Layer
+  (PostgreSQL/Prisma)        Inference Layer         [Gemini 2.5 Flash /
+           │                        │                 OpenAI / Grounded Mock]
+    ┌──────┴──────┐        ┌────────┴────────┐               │
+    ▼             ▼        ▼                 ▼               │
+ projects  project_updates FastAPI Server   Embedded Weight  │
+    │             │        [ml/api/main.py] Engine (<2ms)    │
+    └──────┬──────┘        (Railway/Local)  [ml-local-engine]│
+           ▼                        │        │               │
+  predictions & deduplicated        └────┬───┘               ▼
+      early_warnings                     ▼           ContextBuilder &
+                             Normalized SHAP Drivers <untrusted_retrieved_data>
 ```
 
 ---
@@ -38,7 +40,7 @@ Application Database (PostgreSQL) FastAPI ML Inference     LLM Provider Layer
 ## 2. Responsibilities of Each Layer
 
 ### Layer 1: Client & Next.js Presentation Layer
-- **Responsibility**: Renders responsive analytical dashboards, project detail views, historical S-curves, and alert feeds.
+- **Responsibility**: Renders responsive analytical dashboards, state-wise India choropleth map, project dossiers with S-curves and deduplicated diagnostic warning cards, probability bracket histograms, Data Lab ingestion workbench, and the AI Intelligence Assistant.
 - **Access Pattern**: Communicates **only** with the Next.js Backend API routes.
 - **Rule**: The browser **never** calls the Python ML Service directly, preventing client-side tampering of model parameters and exposing internal ML endpoints.
 
@@ -46,12 +48,12 @@ Application Database (PostgreSQL) FastAPI ML Inference     LLM Provider Layer
 - **Responsibility**:
   - Validates API request parameters and route contexts (`await context.params`).
   - Handles business authorization, filtering, pagination, and data access.
-  - Serves as the orchestration layer: reads project snapshots from PostgreSQL, constructs observation-time payloads, invokes the ML service, persists predictions, and triggers early warning rules.
+  - Serves as the orchestration layer: reads project snapshots from PostgreSQL, constructs observation-time payloads, invokes the hybrid ML client, persists predictions, and evaluates deduplicated early warning rules.
 - **Components**:
-  - `ProjectService`: Queries projects, filters by sector/ministry/state/risk, and retrieves historical snapshots.
-  - `PredictionService`: Orchestrates the prediction flow inside an atomic database transaction.
-  - `MLClient`: Dedicated HTTP client with runtime Zod schema validation.
-  - `RiskEngine`: Heuristic risk scoring (LOW, MEDIUM, HIGH) and deterministic early warning evaluation.
+  - `ProjectService`: Queries projects, filters by sector/ministry/state/risk, deduplicates active warnings by rule (`warningType`), and retrieves historical snapshots.
+  - `PredictionService`: Orchestrates the prediction flow inside an atomic database transaction, resolving prior active warnings for the project before persisting fresh rule evaluations.
+  - `MLClient` & `predictWithEmbeddedWeights`: Dedicated HTTP client (`lib/ml-client.ts`) with runtime Zod validation and automatic zero-downtime failover to the embedded weight-faithful engine (`lib/ml-local-engine.ts` backed by `ml/models/exported_weights.json`).
+  - `RiskEngine`: Risk tier classification (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) and deterministic early warning evaluation.
 
 ### Layer 3: Application Data Layer (PostgreSQL & Prisma ORM)
 - **Responsibility**: Persistent storage of project master records, monthly monitoring snapshots, model predictions, and active/resolved early warning notifications.
@@ -59,28 +61,23 @@ Application Database (PostgreSQL) FastAPI ML Inference     LLM Provider Layer
   - `projects`: One record per project, marked with `is_synthetic: true/false`.
   - `project_updates`: Chronological monthly snapshots. Uses composite uniqueness `@@unique([projectId, snapshotMonth])` to prevent duplicate reporting periods.
   - `predictions`: Stored dual-target probability estimates, binary classifications, model versions, and risk tiers.
-  - `early_warnings`: Actionable warnings linked to projects, snapshots, and predictions.
+  - `early_warnings`: Actionable warnings linked to projects, snapshots, and predictions (deduplicated per active rule).
 - **Anti-Leakage Rule**: Quarantined post-completion fields (`final_cost_cr`, `actual_duration_months`, `cost_overrun`, `time_overrun`) are **strictly excluded** from the database schema and snapshot storage.
 
-### Layer 4: FastAPI ML Inference Service (`ml/api/`)
-- **Responsibility**: Stateless microservice serving calibrated probability predictions.
+### Layer 4: Hybrid Dual-Target ML Inference Layer (`ml/api/` & `lib/ml-local-engine.ts`)
+- **Responsibility**: Stateless inference serving calibrated probability predictions and normalized local SHAP feature attributions (`LinearExplainer` for Cost Overrun + `TreeExplainer` for Schedule Delay).
 - **Components**:
-  - Deserializes trained pipelines (`model.joblib`) into memory **once** on application startup.
-  - Executes feature transformations using the single source of truth: `ml/src/features.py`.
-  - Enforces Pydantic `extra="forbid"` to reject any payload containing post-completion outcome data.
+  - **Primary FastAPI Service (`ml/api/main.py`)**: Deserializes trained pipelines (`model.joblib`) into memory on startup, includes a Windows Smart App Control C-extension shim (`_safe_import`), and enforces Pydantic `extra="forbid"`. Deployed standalone via `ml/Dockerfile` and `ml/railway.json`.
+  - **Embedded Weight-Faithful Failover (`lib/ml-local-engine.ts`)**: Loads the exact exported `RobustScaler` centers/IQRs, `OneHotEncoder` categories, 75-feature `LogisticRegression` weights, and all 150 `RandomForest` decision trees from `ml/models/exported_weights.json` to execute `<2ms` model-authentic inference whenever the external FastAPI server is offline.
 
 ### Layer 5: PRAGATI Project Intelligence Assistant Layer (`lib/ai/`, `app/api/assistant/`)
 - **Responsibility**: Grounded natural-language reasoning, multi-project comparison, and advisory monitoring assistance.
-- **Zero-Calculation Rule**: The LLM is **never** the predictive model. All probabilities, risk tiers, and feature attributions originate strictly from the ML inference service and PostgreSQL / synthetic dataset.
+- **Zero-Calculation Rule**: The LLM is **never** the predictive model. All probabilities, risk tiers, and feature attributions originate strictly from the ML inference layer and PostgreSQL / canonical dataset.
 - **Components**:
-  - `ContextBuilder`: Extracts entities (`PRJ-XXXX`, sector comparisons, portfolio aggregations) and assembles quarantined structured payloads (`<untrusted_retrieved_data>`).
-  - `LLMProvider` abstraction: Pluggable provider interface supporting Google Gemini, OpenAI-compatible endpoints (Groq, Ollama, OpenAI), and a deterministic offline `MockGroundedProvider` for zero-dependency development and CI test execution.
+  - `ContextBuilder`: Extracts entities (`PRJ-XXXX`, sector/state comparisons, burn-gap leaders, portfolio aggregations) and assembles quarantined structured payloads (`<untrusted_retrieved_data>`).
+  - `LLMProvider` abstraction: Prioritizes live **Google Gemini (`gemini-2.5-flash`)** when `GEMINI_API_KEY` is configured (automatically upgrading legacy `gemini-1.5-*` model identifiers), supports OpenAI-compatible endpoints, and provides a **question-aware** deterministic `MockGroundedProvider` for offline execution.
   - `ConversationStore`: Session tracking and audit logging in memory without saving secrets or sensitive credentials.
-  - `Structured AssistantResponse`: Schema-enforced output format categorizing answers into Executive Answer, Observed Telemetry & Evidence, Model-Supported Risk Signals, Recommended Review Actions, and Limitations / Advisory Notes.
-- **Safety & Prompt Injection Defense**:
-  - All database telemetry and ML outputs are quarantined inside XML tags.
-  - System instructions forbid executing procedural commands, overriding safety rules, or treating data text as instructions.
-  - Advisory verb guardrails enforce monitoring actions (`review`, `investigate`, `verify`, `request clarification`, `monitor`) and forbid simulated official government mandates.
+  - `Structured AssistantResponse`: Schema-enforced output format categorizing answers into Executive Summary, Observed Telemetry & Evidence, Model-Supported Risk Signals, Recommended Review Actions, and Limitations.
 
 ---
 

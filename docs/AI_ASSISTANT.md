@@ -138,16 +138,16 @@ export interface LLMProvider {
 
 ### Supported Providers:
 
-1. **`MockGroundedProvider` (Default & Offline Fallback)**:
-   - Evaluates structured context deterministically from telemetry, SHAP drivers, and early warnings.
-   - Requires **zero external API keys or network connection**.
-   - Guarantees automated test suites and local prototype demonstrations run seamlessly.
-2. **`GeminiProvider`**:
-   - Native integration with Google Gemini (`gemini-2.5-flash` or `gemini-1.5-flash`).
-   - Configured via `GEMINI_API_KEY`.
-3. **`OpenAIProvider`**:
+1. **`GeminiProvider` (Primary Live Provider — `gemini-2.5-flash`)**:
+   - Native integration with Google Gemini (`gemini-2.5-flash`), automatically selected whenever `GEMINI_API_KEY` is configured in `.env`.
+   - Automatically normalizes legacy `gemini-1.5-*` model identifiers to `gemini-2.5-flash` and parses structured JSON responses.
+   - Grounded by `ContextBuilder` with full project telemetry, deduplicated active warnings, state-level delay concentrations (`top_risk_states`), expenditure burn-gap outliers (`top_burn_gap_projects`), and sector-specific highlights (`sector_highlights`).
+2. **`OpenAIProvider`**:
    - Integrates with OpenAI, Groq, Ollama, or any OpenAI-compatible completions endpoint.
    - Configured via `OPENAI_API_KEY` and optional `OPENAI_BASE_URL`.
+3. **`MockGroundedProvider` (Question-Aware Offline Fallback)**:
+   - Evaluates structured context deterministically from telemetry, SHAP drivers, state/sector distributions, and early warnings, tailoring responses specifically to the user's question (states, burn gaps, sectors, schedule drivers, warnings, or remedial actions).
+   - Requires **zero external API keys or network connection**, guaranteeing offline resilience and deterministic CI test execution.
 
 ---
 

@@ -48,9 +48,10 @@ Uploaded Document (PDF, CSV, XLSX, JSON, TXT, MD)
 ```
 
 ### Critical Architecture Rules:
-1. **Single Unified ML Pipeline**: Uploaded datasets pass through the exact same feature transformations (`features.py`), model pipelines (`model.joblib`), and FastAPI inference service (`ml/api/main.py`) as the rest of the PRAGATI platform. No secondary or ad-hoc ML model is created.
-2. **Anti-Leakage Quarantine**: Future outcome variables (`final_cost_cr`, `actual_duration_months`, `cost_overrun`, `time_overrun`) are strictly dropped and forbidden from entering the feature matrix.
-3. **Transparent Provenance**: Saved records are explicitly tagged with `isSynthetic = false` alongside source file hashes, import timestamps, parser versions, and model versions.
+1. **Zero-Downtime Hybrid ML Pipeline**: Uploaded datasets pass through `mlClient.predictOverrun()` (`lib/ml-client.ts`), which queries the FastAPI microservice (`ML_SERVICE_URL/predict`) and automatically fails over to `predictWithEmbeddedWeights()` (`lib/ml-local-engine.ts` backed by `ml/models/exported_weights.json`). This guarantees 100% real, weight-faithful `LogisticRegression` + `RandomForest` predictions and normalized SHAP drivers even when the Python FastAPI server is not running locally.
+2. **Decoupled Horizon Scaling**: Official MoSPI PAIMANA multi-year infrastructure projects (spanning 48–160+ months) are automatically scaled across cost and schedule horizons (`cost_overrun` vs. `time_overrun`) so duration alone does not artificially inflate budget overrun log-odds when `Anticipated Cost == Original Cost`.
+3. **Anti-Leakage Quarantine**: Future post-completion outcome variables (`final_cost_cr`, `actual_duration_months`, `cost_overrun`, `time_overrun`) are strictly dropped and forbidden from entering the feature matrix.
+4. **Transparent Provenance**: Saved records are explicitly tagged with `isSynthetic = false` alongside source file hashes, import timestamps, and active model versions.
 
 ---
 
@@ -58,34 +59,41 @@ Uploaded Document (PDF, CSV, XLSX, JSON, TXT, MD)
 
 | Format | Parsing Engine | Description & Supported Structures |
 | :--- | :--- | :--- |
-| **CSV** | RFC-Compliant Stream Parser | Multi-project tabular datasets, comma/quote separated. |
+| **PDF** | `pdf-parse` + MoSPI Table Extractor | Official MoSPI PAIMANA Flash Report PDFs (`FRApril2025.pdf`, `FlashReport_August_2026.pdf`) and structured inspection dossiers. |
 | **XLSX / XLS** | `xlsx` (SheetJS) | Multi-project spreadsheets with automatic sheet inspection. |
+| **CSV** | RFC-Compliant Stream Parser | Multi-project tabular datasets, comma/quote separated. |
 | **JSON** | Native V8 JSON Parser | Structured PAIMANA Common Upload Form (CUF) payloads or project lists. |
-| **TXT** | Line-by-Line Key-Value Splitter | Text inspection reports, monitoring circulars, and unstructured dossier key-values. |
-| **MD** | Markdown Table & Key-Value Extractor | Formatted project dossiers with pipes (`|`) or key-value markdown pairs. |
-| **PDF** | `pdf-parse` Safe Extractor | Structured project monitoring PDFs and telemetry summary sheets. |
+| **TXT / MD** | Key-Value & Pipe Table Extractor | Text inspection reports, monitoring circulars, and markdown tables. |
 
 ---
 
-## 4. Canonical Project Schema (15 Required Prediction Fields)
+## 4. Official 3-Tier PAIMANA Schema Checklist (19 Canonical Fields)
 
-| Canonical Key | Type | Description | Unit / Constraint |
+The Data Lab organizes the 19 canonical fields into **3 operational tiers** aligned with official MoSPI PAIMANA Flash Reports:
+
+### Tier 1: Core Required Fields (10 Fields — Directly in MoSPI Flash Reports)
+| Canonical Key | MoSPI Flash Report Header | Example | Description |
 | :--- | :--- | :--- | :--- |
-| `project_id` | string | Unique project identifier | Required, non-empty |
-| `snapshot_month` | date | Observation period | `YYYY-MM` |
-| `ministry` | string | Central/State nodal ministry | Required |
-| `sector` | string | Infrastructure domain | Required |
-| `implementing_agency`| string | Executing agency / PSU | Required |
-| `state` | string | Geographic location / State | Required |
-| `original_cost_cr` | number | Approved sanction cost | Float $> 0$ (₹ Crores) |
-| `planned_duration_months` | number | Contractual planned schedule | Integer $> 0$ (Months) |
-| `elapsed_months` | number | Months since commencement | Integer $\ge 0$ (Months) |
-| `physical_progress_pct` | number | Physical delivery completion | Float $[0.0 - 100.0]$ (%) |
-| `financial_progress_pct`| number | Financial fund utilization | Float $[0.0 - 100.0]$ (%) |
-| `expenditure_cr` | number | Incurred cumulative spending | Float $\ge 0$ (₹ Crores) |
-| `milestones_total` | number | Total planned milestones | Integer $> 0$ |
-| `milestones_delayed` | number | Delayed milestone count | Integer $\ge 0$ |
-| `project_status` | string | Operational status | Ongoing, Delayed, Critical, etc. |
+| `project_code` | `Project Code` / `Sl. No.` | `PAIMANA-400259` | Unique PAIMANA / OCMS identifier |
+| `project_name` | `Project Name` | `Ghatampur Thermal Power (3x660 MW)` | Official infrastructure asset title |
+| `sector` | `Sector` / `Ministry` | `Power` | Infrastructure sector mapped to OHE taxonomy |
+| `state` | `State` | `Uttar Pradesh` | Primary state or Multi-State corridor |
+| `sanctioned_cost_cr` | `Original Cost (₹ Cr)` | `17237.8` | Initial cabinet/CCEA sanctioned budget |
+| `revised_cost_cr` | `Anticipated Cost (₹ Cr)` | `21780.84` | Latest revised/anticipated project cost |
+| `spent_cost_cr` | `Cumulative Expenditure` | `19788.78` | Cumulative capital expenditure incurred |
+| `sanction_date` | `Date of Approval` | `2016-11-01` | Original approval date (`YYYY-MM` / `MM/YYYY`) |
+| `scheduled_completion_date` | `Original DOC` | `2022-05-01` | Original contractual commissioning date |
+| `expected_completion_date` | `Anticipated DOC` | `2025-12-01` | Latest anticipated commissioning date |
+
+### Tier 2: Auto-Derived PAIMANA Fields (5 Fields — Computed Automatically if Omitted)
+- `implementing_agency`: Auto-inferred from project name/sector (`NHAI`, `RVNL`, `NTPC`, `AAI`, `PGCIL`, `MMRCL`, `State PWD`, etc.) if not explicitly present.
+- `contractor_name`: Defaults to `EPC Turnkey / Departmental Execution` when absent in Flash Report summaries.
+- `physical_progress_pct`: Auto-derived from expenditure ratio and schedule trajectory when missing from summary tables.
+- `terrain_type`: Auto-mapped from state geography (`Hilly`, `Coastal`, `Urban`, `Plains`).
+- `environmental_clearance_status`: Auto-derived from project execution stage (`Obtained`, `Pending`, `In-Process`).
+
+### Tier 3: Optional Telemetry Enrichment Fields (4 Fields)
+- `rainfall_anomaly_pct`, `land_acquisition_delay_months`, `utility_shifting_delay_months`, and `district_gdp_growth_pct` (auto-imputed with state/sector baselines when omitted).
 
 ---
 

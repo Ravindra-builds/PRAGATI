@@ -667,29 +667,29 @@ curl -X POST http://localhost:3000/api/assistant/chat `
   -H "Content-Type: application/json" `
   -d '{
     "message": "Why is PRJ-0016 flagged for high risk?",
-    "activeProjectId": "PRJ-0016"
+    "projectId": "PRJ-0016"
   }'
 ```
-- **Expected response (`200 OK`)**: Returns structured JSON conforming to `AssistantResponse` with `executiveAnswer`, `observedTelemetry`, `modelRiskSignals`, `recommendedActions`, and `limitationsAdvisory`.
+- **Expected response (`200 OK`)**: Returns structured JSON conforming to `AssistantResponse` with `answer`, `evidence`, `model_signals`, `recommendations`, and `limitations`.
 
 ---
 
 ### Switch LLM Provider
 Set environment variables in `.env`:
 ```bash
-# 1. Deterministic Grounded Offline Mock (Default - Zero API Keys Needed)
-LLM_PROVIDER=mock
-
-# 2. Google Gemini (Recommended for Production / Evaluation)
+# 1. Google Gemini (Primary Live Provider — Auto-enabled when GEMINI_API_KEY is set)
 LLM_PROVIDER=gemini
 GEMINI_API_KEY="your-gemini-api-key"
-LLM_MODEL="gemini-1.5-flash"
+LLM_MODEL="gemini-2.5-flash"
 
-# 3. OpenAI-Compatible API (OpenAI, Groq, Ollama)
+# 2. OpenAI-Compatible API (OpenAI, Groq, Ollama)
 LLM_PROVIDER=openai
 OPENAI_API_KEY="your-api-key"
 OPENAI_BASE_URL="https://api.groq.com/openai/v1" # Optional
 LLM_MODEL="llama-3.3-70b-versatile"
+
+# 3. Deterministic Question-Aware Grounded Offline Mock (Zero API Keys Needed)
+LLM_PROVIDER=mock
 ```
 
 ---
