@@ -47,7 +47,7 @@ class PredictionRequest(BaseModel):
     planned_duration_months: int = Field(..., gt=0, description="Approved contractual duration in months (must be > 0)")
     elapsed_months: int = Field(..., gt=0, description="Months elapsed at snapshot date (must be > 0)")
     physical_progress_pct: float = Field(..., ge=0.0, le=100.0, description="Physical progress percentage [0.0 - 100.0]")
-    financial_progress_pct: float = Field(..., ge=0.0, le=100.0, description="Financial progress percentage [0.0 - 100.0]")
+    financial_progress_pct: float = Field(..., ge=0.0, le=250.0, description="Financial progress percentage [0.0 - 250.0]")
     expenditure_cr: float = Field(..., ge=0.0, description="Cumulative expenditure incurred in ₹ Crores (must be >= 0)")
     milestones_total: int = Field(..., gt=0, description="Total planned milestones (must be > 0)")
     milestones_delayed: int = Field(..., ge=0, description="Number of milestones delayed (must be >= 0)")

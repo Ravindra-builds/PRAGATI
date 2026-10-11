@@ -131,13 +131,13 @@ export function validateCanonicalRecords(
     }
 
     if (rec.financial_progress_pct !== undefined) {
-      if (typeof rec.financial_progress_pct !== 'number' || isNaN(rec.financial_progress_pct) || rec.financial_progress_pct < 0 || rec.financial_progress_pct > 100) {
+      if (typeof rec.financial_progress_pct !== 'number' || isNaN(rec.financial_progress_pct) || rec.financial_progress_pct < 0 || rec.financial_progress_pct > 250) {
         errors.push({
           recordIndex: index,
           projectId,
           field: 'financial_progress_pct',
           value: rec.financial_progress_pct,
-          message: 'Financial progress must be between 0.0% and 100.0%.',
+          message: 'Financial progress must be between 0.0% and 250.0%.',
           isCritical: true,
         })
         recordHasCriticalError = true

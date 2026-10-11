@@ -8,11 +8,18 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { predictWithEmbeddedWeights } from '../ml-local-engine'
+import { calculateOverallRisk } from '../risk-engine'
 import {
   syntheticDatasetService,
   AlertFilters,
   AnalyticsFilters,
   AnalyticsPayload,
+  ProgressScatterPoint,
+  SectorAnalyticsItem,
+  MinistryAnalyticsItem,
+  StateAnalyticsItem,
+  TemporalTrendPoint,
 } from './synthetic-dataset'
 
 export type { AlertFilters, AnalyticsFilters, AnalyticsPayload }
@@ -82,6 +89,14 @@ export interface RecentWarningItem {
 }
 
 export class ProjectService {
+  private analyticsCache = new Map<string, { data: AnalyticsPayload; expiresAt: number }>()
+  private summaryCache = new Map<string, { data: any; expiresAt: number }>()
+
+  clearCache() {
+    this.analyticsCache.clear()
+    this.summaryCache.clear()
+  }
+
   /**
    * List projects with filters, search, and pagination.
    * Includes the latest snapshot and latest prediction summary.
@@ -125,10 +140,9 @@ export class ProjectService {
       }
 
       const totalBaselineCount = await prisma.project.count()
-      const totalPredsCount = await prisma.prediction.count()
 
-      if (totalBaselineCount < 850 || totalPredsCount < 850) {
-        // Database is partially seeded or missing baseline predictions; use verified synthetic dataset
+      if (totalBaselineCount === 0) {
+        // Database has no seeded projects; use verified synthetic dataset
         return syntheticDatasetService.getProjects(filters)
       }
 
@@ -157,7 +171,54 @@ export class ProjectService {
       })
 
       const formatted = projects.map((p) => {
-        const synthFallback = !p.predictions[0] ? syntheticDatasetService.getProjectById(p.projectId) : null
+        let latestPred = p.predictions[0] || null
+        if (!latestPred) {
+          const synthFallback = syntheticDatasetService.getProjectById(p.projectId)
+          if (synthFallback?.latestPrediction) {
+            latestPred = synthFallback.latestPrediction as any
+          } else if (p.updates[0]) {
+            try {
+              const u = p.updates[0]
+              const mlRes = predictWithEmbeddedWeights({
+                project_id: p.projectId,
+                snapshot_month: u.snapshotMonth,
+                ministry: p.ministry,
+                sector: p.sector,
+                implementing_agency: p.implementingAgency,
+                state: p.state,
+                original_cost_cr: p.originalCostCr,
+                planned_duration_months: p.plannedDurationMonths,
+                elapsed_months: u.elapsedMonths,
+                physical_progress_pct: u.physicalProgressPct,
+                financial_progress_pct: u.financialProgressPct,
+                expenditure_cr: u.expenditureCr,
+                milestones_total: u.milestonesTotal,
+                milestones_delayed: u.milestonesDelayed,
+                project_status: u.projectStatus,
+              })
+              const overallRisk = calculateOverallRisk(
+                mlRes.cost_overrun.probability,
+                mlRes.time_overrun.probability,
+                mlRes.cost_overrun.prediction,
+                mlRes.time_overrun.prediction
+              )
+              latestPred = {
+                id: `pred_dyn_${p.projectId}`,
+                projectId: p.projectId,
+                projectUpdateId: u.id,
+                costOverrunProbability: mlRes.cost_overrun.probability,
+                costPrediction: mlRes.cost_overrun.prediction,
+                timeOverrunProbability: mlRes.time_overrun.probability,
+                timePrediction: mlRes.time_overrun.prediction,
+                costModelVersion: 'Logistic Regression (L2)',
+                timeModelVersion: 'Random Forest (150 trees)',
+                overallRiskLevel: overallRisk,
+                createdAt: new Date(),
+              } as any
+            } catch {}
+          }
+        }
+
         return {
           id: p.id,
           projectId: p.projectId,
@@ -170,9 +231,9 @@ export class ProjectService {
           plannedDurationMonths: p.plannedDurationMonths,
           status: p.status,
           isSynthetic: p.isSynthetic,
-          latestUpdate: p.updates[0] || synthFallback?.latestUpdate || null,
-          latestPrediction: p.predictions[0] || synthFallback?.latestPrediction || null,
-          activeWarningsCount: p.warnings.length || synthFallback?.activeWarningsCount || 0,
+          latestUpdate: p.updates[0] || null,
+          latestPrediction: latestPred,
+          activeWarningsCount: p.warnings.length,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
         }
@@ -369,12 +430,15 @@ export class ProjectService {
    * Portfolio Summary for Dashboard KPI cards, risk distribution and early warning feed.
    */
   async getDashboardSummary(filters: { sector?: string; ministry?: string; state?: string } = {}) {
+    const cacheKey = JSON.stringify(filters)
+    const cached = this.summaryCache.get(cacheKey)
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data
+    }
+
     try {
       const totalBaselineCount = await prisma.project.count()
-      const totalPredsCount = await prisma.prediction.count()
-
-      // If database does not have the full 850 projects & predictions seeded, use canonical dataset summary
-      if (totalBaselineCount < 850 || totalPredsCount < 850) {
+      if (totalBaselineCount === 0) {
         return syntheticDatasetService.getSummary(filters)
       }
 
@@ -461,14 +525,17 @@ export class ProjectService {
         return score(b) - score(a)
       })
 
-      // Distinct filter options
-      const [ministriesRaw, sectorsRaw, statesRaw] = await Promise.all([
-        prisma.project.findMany({ select: { ministry: true }, distinct: ['ministry'] }),
-        prisma.project.findMany({ select: { sector: true }, distinct: ['sector'] }),
-        prisma.project.findMany({ select: { state: true }, distinct: ['state'] }),
-      ])
+      // Distinct filter options safely extracted from projects
+      const ministrySet = new Set<string>()
+      const sectorSet = new Set<string>()
+      const stateSet = new Set<string>()
+      for (const p of projects) {
+        if (p.ministry) ministrySet.add(p.ministry)
+        if (p.sector) sectorSet.add(p.sector)
+        if (p.state) stateSet.add(p.state)
+      }
 
-      return {
+      const result = {
         totalProjects,
         highRiskProjects: riskDistribution.HIGH,
         criticalProjects: riskDistribution.CRITICAL,
@@ -480,11 +547,14 @@ export class ProjectService {
         attentionProjects: attentionProjects.slice(0, 8),
         recentWarnings: recentWarnings.slice(0, 8),
         filterOptions: {
-          ministries: ministriesRaw.map((m) => m.ministry).sort(),
-          sectors: sectorsRaw.map((s) => s.sector).sort(),
-          states: statesRaw.map((s) => s.state).sort(),
+          ministries: Array.from(ministrySet).sort(),
+          sectors: Array.from(sectorSet).sort(),
+          states: Array.from(stateSet).sort(),
         },
       }
+
+      this.summaryCache.set(cacheKey, { data: result, expiresAt: Date.now() + 60_000 })
+      return result
     } catch {
       return syntheticDatasetService.getSummary(filters)
     }
@@ -498,12 +568,8 @@ export class ProjectService {
     const offset = Math.max(Number(filters.offset) || 0, 0)
 
     try {
-      const [totalProjectsInDb, totalActiveWarningsInDb] = await Promise.all([
-        prisma.project.count(),
-        prisma.earlyWarning.count({ where: { resolvedAt: null } }),
-      ])
-
-      if (totalProjectsInDb < 850 || totalActiveWarningsInDb < 100) {
+      const totalProjectsInDb = await prisma.project.count()
+      if (totalProjectsInDb === 0) {
         return syntheticDatasetService.getAlerts(filters)
       }
 
@@ -599,19 +665,32 @@ export class ProjectService {
       })
 
       // Query summary counts across all active warnings
-      const [totalCount, criticalCount, highCount, mediumCount, lowCount, byTypeRaw] =
-        await Promise.all([
-          prisma.earlyWarning.count({ where: { resolvedAt: null } }),
-          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'CRITICAL' } }),
-          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'HIGH' } }),
-          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'MEDIUM' } }),
-          prisma.earlyWarning.count({ where: { resolvedAt: null, severity: 'LOW' } }),
-          prisma.earlyWarning.groupBy({
-            by: ['warningType'],
-            where: { resolvedAt: null },
-            _count: { id: true },
-          }),
-        ])
+      const bySeverityRaw = await prisma.earlyWarning.groupBy({
+        by: ['severity'],
+        where: { resolvedAt: null },
+        _count: { id: true },
+      })
+      const byTypeRaw = await prisma.earlyWarning.groupBy({
+        by: ['warningType'],
+        where: { resolvedAt: null },
+        _count: { id: true },
+      })
+
+      let totalCount = 0
+      let criticalCount = 0
+      let highCount = 0
+      let mediumCount = 0
+      let lowCount = 0
+
+      for (const item of bySeverityRaw) {
+        const c = item._count.id
+        totalCount += c
+        const s = item.severity.toUpperCase()
+        if (s === 'CRITICAL') criticalCount = c
+        else if (s === 'HIGH') highCount = c
+        else if (s === 'MEDIUM') mediumCount = c
+        else if (s === 'LOW') lowCount = c
+      }
 
       const byType: Record<string, number> = {
         COST_OVERRUN_RISK: 0,
@@ -647,8 +726,466 @@ export class ProjectService {
    * progress scatter points, and temporal risk trajectory.
    */
   async getAnalyticsData(filters: AnalyticsFilters = {}): Promise<AnalyticsPayload> {
-    // Leverage the fully loaded and verified dataset service for portfolio-scale analytics
-    return syntheticDatasetService.getAnalyticsData(filters)
+    const cacheKey = JSON.stringify(filters)
+    const cached = this.analyticsCache.get(cacheKey)
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data
+    }
+
+    try {
+      const totalInDb = await prisma.project.count()
+      if (totalInDb === 0) {
+        return syntheticDatasetService.getAnalyticsData(filters)
+      }
+
+      const dbProjects = await prisma.project.findMany({
+        select: {
+          id: true,
+          projectId: true,
+          name: true,
+          sector: true,
+          ministry: true,
+          state: true,
+          originalCostCr: true,
+          plannedDurationMonths: true,
+          updates: {
+            orderBy: { snapshotMonth: 'asc' },
+            select: {
+              snapshotMonth: true,
+              physicalProgressPct: true,
+              financialProgressPct: true,
+              expenditureCr: true,
+              elapsedMonths: true,
+            },
+          },
+          predictions: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+            select: {
+              costOverrunProbability: true,
+              timeOverrunProbability: true,
+              overallRiskLevel: true,
+            },
+          },
+        },
+      })
+
+      const distinctMinistries = new Set<string>()
+      const distinctSectors = new Set<string>()
+      const distinctStates = new Set<string>()
+
+      for (const p of dbProjects) {
+        if (p.ministry) distinctMinistries.add(p.ministry)
+        if (p.sector) distinctSectors.add(p.sector)
+        if (p.state) distinctStates.add(p.state)
+      }
+
+      let filtered = dbProjects
+
+      if (filters.ministry && filters.ministry !== 'ALL') {
+        const m = filters.ministry.toLowerCase()
+        filtered = filtered.filter((p) => p.ministry.toLowerCase() === m)
+      }
+      if (filters.sector && filters.sector !== 'ALL') {
+        const s = filters.sector.toLowerCase()
+        filtered = filtered.filter((p) => p.sector.toLowerCase() === s)
+      }
+      if (filters.state && filters.state !== 'ALL') {
+        const st = filters.state.toLowerCase()
+        filtered = filtered.filter((p) => p.state.toLowerCase() === st)
+      }
+      if (filters.risk && filters.risk !== 'ALL') {
+        const r = filters.risk.toUpperCase()
+        filtered = filtered.filter(
+          (p) => (p.predictions[0]?.overallRiskLevel || 'LOW').toUpperCase() === r
+        )
+      }
+
+      const totalProjects = filtered.length
+
+      let criticalProjects = 0
+      let highRiskProjects = 0
+      let mediumRiskProjects = 0
+      let lowRiskProjects = 0
+
+      let totalSanctionedCostCr = 0
+      let totalExpenditureCr = 0
+      let costRiskExposureCr = 0
+      let scheduleDelayExposureCount = 0
+
+      const sectorMap = new Map<
+        string,
+        {
+          total: number
+          critical: number
+          high: number
+          medium: number
+          low: number
+          costProbSum: number
+          timeProbSum: number
+          costCr: number
+          expCr: number
+        }
+      >()
+
+      const ministryMap = new Map<
+        string,
+        {
+          total: number
+          critical: number
+          high: number
+          medium: number
+          low: number
+          costProbSum: number
+          timeProbSum: number
+          costCr: number
+        }
+      >()
+
+      const stateMap = new Map<
+        string,
+        {
+          total: number
+          critical: number
+          high: number
+          medium: number
+          low: number
+          costProbSum: number
+          timeProbSum: number
+          costCr: number
+          expCr: number
+          physProgressSum: number
+          finProgressSum: number
+        }
+      >()
+
+      const costBuckets: [number, number, number][] = [
+        [0.0, 0.2, 0],
+        [0.2, 0.4, 0],
+        [0.4, 0.6, 0],
+        [0.6, 0.8, 0],
+        [0.8, 1.0, 0],
+      ]
+
+      const timeBuckets: [number, number, number][] = [
+        [0.0, 0.2, 0],
+        [0.2, 0.4, 0],
+        [0.4, 0.6, 0],
+        [0.6, 0.8, 0],
+        [0.8, 1.0, 0],
+      ]
+
+      const scatterPoints: ProgressScatterPoint[] = []
+
+      const monthlyProgressMap = new Map<
+        string,
+        { physSum: number; finSum: number; count: number; highOrCritical: number }
+      >()
+
+      for (const p of filtered) {
+        totalSanctionedCostCr += p.originalCostCr
+        const latestUpdate = p.updates[p.updates.length - 1] || null
+        const latestPred = p.predictions[0] || null
+
+        const risk = (latestPred?.overallRiskLevel || 'LOW').toUpperCase()
+        if (risk === 'CRITICAL') criticalProjects++
+        else if (risk === 'HIGH') highRiskProjects++
+        else if (risk === 'MEDIUM') mediumRiskProjects++
+        else lowRiskProjects++
+
+        const costProb = latestPred?.costOverrunProbability ?? 0.25
+        const timeProb = latestPred?.timeOverrunProbability ?? 0.25
+
+        if (costProb >= 0.5) costRiskExposureCr += p.originalCostCr
+        if (timeProb >= 0.5) scheduleDelayExposureCount++
+
+        const expCr = latestUpdate?.expenditureCr ?? 0
+        totalExpenditureCr += expCr
+
+        if (!sectorMap.has(p.sector)) {
+          sectorMap.set(p.sector, {
+            total: 0,
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            costProbSum: 0,
+            timeProbSum: 0,
+            costCr: 0,
+            expCr: 0,
+          })
+        }
+        const sEntry = sectorMap.get(p.sector)!
+        sEntry.total++
+        if (risk === 'CRITICAL') sEntry.critical++
+        else if (risk === 'HIGH') sEntry.high++
+        else if (risk === 'MEDIUM') sEntry.medium++
+        else sEntry.low++
+        sEntry.costProbSum += costProb
+        sEntry.timeProbSum += timeProb
+        sEntry.costCr += p.originalCostCr
+        sEntry.expCr += expCr
+
+        if (!ministryMap.has(p.ministry)) {
+          ministryMap.set(p.ministry, {
+            total: 0,
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            costProbSum: 0,
+            timeProbSum: 0,
+            costCr: 0,
+          })
+        }
+        const mEntry = ministryMap.get(p.ministry)!
+        mEntry.total++
+        if (risk === 'CRITICAL') mEntry.critical++
+        else if (risk === 'HIGH') mEntry.high++
+        else if (risk === 'MEDIUM') mEntry.medium++
+        else mEntry.low++
+        mEntry.costProbSum += costProb
+        mEntry.timeProbSum += timeProb
+        mEntry.costCr += p.originalCostCr
+
+        if (!stateMap.has(p.state)) {
+          stateMap.set(p.state, {
+            total: 0,
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            costProbSum: 0,
+            timeProbSum: 0,
+            costCr: 0,
+            expCr: 0,
+            physProgressSum: 0,
+            finProgressSum: 0,
+          })
+        }
+        const stEntry = stateMap.get(p.state)!
+        stEntry.total++
+        if (risk === 'CRITICAL') stEntry.critical++
+        else if (risk === 'HIGH') stEntry.high++
+        else if (risk === 'MEDIUM') stEntry.medium++
+        else stEntry.low++
+        stEntry.costProbSum += costProb
+        stEntry.timeProbSum += timeProb
+        stEntry.costCr += p.originalCostCr
+        stEntry.expCr += expCr
+        stEntry.physProgressSum += (latestUpdate?.physicalProgressPct ?? 0)
+        stEntry.finProgressSum += (latestUpdate?.financialProgressPct ?? 0)
+
+        for (const b of costBuckets) {
+          if (costProb >= b[0] && (b[1] === 1.0 ? costProb <= b[1] : costProb < b[1])) {
+            b[2]++
+            break
+          }
+        }
+        for (const b of timeBuckets) {
+          if (timeProb >= b[0] && (b[1] === 1.0 ? timeProb <= b[1] : timeProb < b[1])) {
+            b[2]++
+            break
+          }
+        }
+
+        const phy = latestUpdate?.physicalProgressPct ?? 0
+        const fin = latestUpdate?.financialProgressPct ?? 0
+        const sched =
+          p.plannedDurationMonths > 0 && latestUpdate
+            ? Math.min(150, (latestUpdate.elapsedMonths / p.plannedDurationMonths) * 100)
+            : 0
+
+        scatterPoints.push({
+          projectId: p.projectId,
+          name: p.name,
+          sector: p.sector,
+          state: p.state,
+          originalCostCr: p.originalCostCr,
+          physicalProgressPct: phy,
+          financialProgressPct: fin,
+          scheduleCompletionPct: Math.round(sched * 10) / 10,
+          costOverrunProbability: costProb,
+          timeOverrunProbability: timeProb,
+          overallRiskLevel: risk,
+        })
+
+        for (const upd of p.updates) {
+          if (!monthlyProgressMap.has(upd.snapshotMonth)) {
+            monthlyProgressMap.set(upd.snapshotMonth, {
+              physSum: 0,
+              finSum: 0,
+              count: 0,
+              highOrCritical: 0,
+            })
+          }
+          const mItem = monthlyProgressMap.get(upd.snapshotMonth)!
+          mItem.physSum += upd.physicalProgressPct
+          mItem.finSum += upd.financialProgressPct
+          mItem.count++
+          if (risk === 'HIGH' || risk === 'CRITICAL') {
+            mItem.highOrCritical++
+          }
+        }
+      }
+
+      const bySector: SectorAnalyticsItem[] = Array.from(sectorMap.entries()).map(([sector, d]) => ({
+        sector,
+        totalProjects: d.total,
+        critical: d.critical,
+        high: d.high,
+        medium: d.medium,
+        low: d.low,
+        criticalProjects: d.critical,
+        highRiskProjects: d.high,
+        mediumRiskProjects: d.medium,
+        lowRiskProjects: d.low,
+        avgCostRisk: Math.round((d.costProbSum / d.total) * 1000) / 1000,
+        avgTimeRisk: Math.round((d.timeProbSum / d.total) * 1000) / 1000,
+        avgCostOverrunProb: Math.round((d.costProbSum / d.total) * 1000) / 1000,
+        avgTimeOverrunProb: Math.round((d.timeProbSum / d.total) * 1000) / 1000,
+        totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
+        totalCostCr: Math.round(d.costCr * 10) / 10,
+        totalExpenditureCr: Math.round(d.expCr * 10) / 10,
+        totalExpCr: Math.round(d.expCr * 10) / 10,
+      }))
+
+      const byMinistry: MinistryAnalyticsItem[] = Array.from(ministryMap.entries()).map(
+        ([ministry, d]) => ({
+          ministry,
+          totalProjects: d.total,
+          critical: d.critical,
+          high: d.high,
+          medium: d.medium,
+          low: d.low,
+          criticalProjects: d.critical,
+          highRiskProjects: d.high,
+          mediumRiskProjects: d.medium,
+          lowRiskProjects: d.low,
+          avgCostRisk: Math.round((d.costProbSum / d.total) * 1000) / 1000,
+          avgTimeRisk: Math.round((d.timeProbSum / d.total) * 1000) / 1000,
+          avgCostOverrunProb: Math.round((d.costProbSum / d.total) * 1000) / 1000,
+          avgTimeOverrunProb: Math.round((d.timeProbSum / d.total) * 1000) / 1000,
+          totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
+          totalCostCr: Math.round(d.costCr * 10) / 10,
+        })
+      )
+
+      const byState: StateAnalyticsItem[] = Array.from(stateMap.entries()).map(([state, d]) => {
+        const avgPhy = Math.round((d.physProgressSum / d.total) * 10) / 10
+        const avgFin = Math.round((d.finProgressSum / d.total) * 10) / 10
+        return {
+          state,
+          totalProjects: d.total,
+          critical: d.critical,
+          high: d.high,
+          medium: d.medium,
+          low: d.low,
+          criticalProjects: d.critical,
+          highRiskProjects: d.high,
+          mediumRiskProjects: d.medium,
+          lowRiskProjects: d.low,
+          avgCostRisk: Math.round((d.costProbSum / d.total) * 1000) / 1000,
+          avgTimeRisk: Math.round((d.timeProbSum / d.total) * 1000) / 1000,
+          avgCostOverrunProb: Math.round((d.costProbSum / d.total) * 1000) / 1000,
+          avgTimeOverrunProb: Math.round((d.timeProbSum / d.total) * 1000) / 1000,
+          totalSanctionedCostCr: Math.round(d.costCr * 10) / 10,
+          totalCostCr: Math.round(d.costCr * 10) / 10,
+          totalExpenditureCr: Math.round(d.expCr * 10) / 10,
+          avgPhysicalProgress: avgPhy,
+          avgFinancialProgress: avgFin,
+          avgBurnGap: Math.round((avgFin - avgPhy) * 10) / 10,
+        }
+      })
+
+      const bucketLabels = ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%']
+      const costProbabilityBuckets = costBuckets.map((b, idx) => ({
+        range: bucketLabels[idx],
+        count: b[2],
+        percentage: totalProjects > 0 ? Math.round((b[2] / totalProjects) * 1000) / 10 : 0,
+      }))
+
+      const timeProbabilityBuckets = timeBuckets.map((b, idx) => ({
+        range: bucketLabels[idx],
+        count: b[2],
+        percentage: totalProjects > 0 ? Math.round((b[2] / totalProjects) * 1000) / 10 : 0,
+      }))
+
+      const sortedMonths = Array.from(monthlyProgressMap.keys()).sort()
+      const temporalTrend: TemporalTrendPoint[] = sortedMonths.map((m) => {
+        const item = monthlyProgressMap.get(m)!
+        return {
+          snapshotMonth: m,
+          avgPhysicalProgressPct: Math.round((item.physSum / item.count) * 10) / 10,
+          avgFinancialProgressPct: Math.round((item.finSum / item.count) * 10) / 10,
+          totalSnapshots: item.count,
+          highOrCriticalCount: item.highOrCritical,
+        }
+      })
+
+      const highOrCriticalCount = criticalProjects + highRiskProjects
+      const highOrCriticalPct =
+        totalProjects > 0 ? Math.round((highOrCriticalCount / totalProjects) * 1000) / 10 : 0
+
+      return {
+        summary: {
+          totalProjects,
+          criticalProjects,
+          highRiskProjects,
+          mediumRiskProjects,
+          lowRiskProjects,
+          highOrCriticalPct,
+          totalSanctionedCostCr: Math.round(totalSanctionedCostCr * 10) / 10,
+          totalExpenditureCr: Math.round(totalExpenditureCr * 10) / 10,
+          costRiskExposureCr: Math.round(costRiskExposureCr * 10) / 10,
+          scheduleDelayExposureCount,
+          scheduleDelayExposurePct:
+            totalProjects > 0
+              ? Math.round((scheduleDelayExposureCount / totalProjects) * 1000) / 10
+              : 0,
+        },
+        riskDistribution: {
+          LOW: {
+            count: lowRiskProjects,
+            percentage: totalProjects > 0 ? Math.round((lowRiskProjects / totalProjects) * 1000) / 10 : 0,
+          },
+          MEDIUM: {
+            count: mediumRiskProjects,
+            percentage: totalProjects > 0 ? Math.round((mediumRiskProjects / totalProjects) * 1000) / 10 : 0,
+          },
+          HIGH: {
+            count: highRiskProjects,
+            percentage: totalProjects > 0 ? Math.round((highRiskProjects / totalProjects) * 1000) / 10 : 0,
+          },
+          CRITICAL: {
+            count: criticalProjects,
+            percentage: totalProjects > 0 ? Math.round((criticalProjects / totalProjects) * 1000) / 10 : 0,
+          },
+        },
+        bySector,
+        byMinistry,
+        byState,
+        scatterPoints,
+        costProbabilityBuckets,
+        timeProbabilityBuckets,
+        temporalTrend,
+        filterOptions: {
+          ministries: Array.from(distinctMinistries).sort(),
+          sectors: Array.from(distinctSectors).sort(),
+          states: Array.from(distinctStates).sort(),
+        },
+        projectList: dbProjects.map((p) => ({
+          projectId: p.projectId,
+          name: p.name,
+          sector: p.sector,
+        })),
+      }
+
+      this.analyticsCache.set(cacheKey, { data: result, expiresAt: Date.now() + 60_000 })
+      return result
+    } catch {
+      return syntheticDatasetService.getAnalyticsData(filters)
+    }
   }
 
   /**
@@ -656,6 +1193,63 @@ export class ProjectService {
    * and ML risk metrics.
    */
   async compareProjects(projectIdA: string, projectIdB: string) {
+    try {
+      const [projA, projB] = await Promise.all([
+        this.getProjectById(projectIdA),
+        this.getProjectById(projectIdB),
+      ])
+
+      const formatDbProject = (p: Awaited<ReturnType<typeof this.getProjectById>>) => {
+        if (!p) return null
+        const latestUpdate = p.updates?.[p.updates.length - 1] || null
+        const schedComp =
+          p.plannedDurationMonths > 0 && latestUpdate
+            ? (latestUpdate.elapsedMonths / p.plannedDurationMonths) * 100
+            : 0
+        const burnGap = latestUpdate
+          ? latestUpdate.financialProgressPct - latestUpdate.physicalProgressPct
+          : 0
+        const milestoneRatio =
+          latestUpdate && latestUpdate.milestonesTotal > 0
+            ? (latestUpdate.milestonesDelayed / latestUpdate.milestonesTotal) * 100
+            : 0
+        const latestPred = p.predictions?.[0] || null
+
+        return {
+          projectId: p.projectId,
+          name: p.name,
+          sector: p.sector,
+          ministry: p.ministry,
+          state: p.state,
+          implementingAgency: p.implementingAgency,
+          originalCostCr: p.originalCostCr,
+          plannedDurationMonths: p.plannedDurationMonths,
+          status: p.status,
+          physicalProgressPct: latestUpdate ? latestUpdate.physicalProgressPct : 0,
+          financialProgressPct: latestUpdate ? latestUpdate.financialProgressPct : 0,
+          expenditureCr: latestUpdate ? latestUpdate.expenditureCr : 0,
+          elapsedMonths: latestUpdate ? latestUpdate.elapsedMonths : 0,
+          scheduleCompletionPct: Math.round(schedComp * 10) / 10,
+          burnGap: Math.round(burnGap * 10) / 10,
+          milestonesTotal: latestUpdate ? latestUpdate.milestonesTotal : 0,
+          milestonesDelayed: latestUpdate ? latestUpdate.milestonesDelayed : 0,
+          milestoneSlippageRatio: Math.round(milestoneRatio * 10) / 10,
+          costOverrunProbability: latestPred ? latestPred.costOverrunProbability : 0,
+          timeOverrunProbability: latestPred ? latestPred.timeOverrunProbability : 0,
+          overallRiskLevel: latestPred ? latestPred.overallRiskLevel : 'LOW',
+          activeWarningsCount: p.warnings ? p.warnings.length : 0,
+        }
+      }
+
+      if (projA || projB) {
+        return {
+          projectA: formatDbProject(projA),
+          projectB: formatDbProject(projB),
+        }
+      }
+    } catch {
+      // Fallback
+    }
     return syntheticDatasetService.compareProjects(projectIdA, projectIdB)
   }
 }

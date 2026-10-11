@@ -11,7 +11,9 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "seed": "tsx scripts/seed-projects.ts",
+    "seed": "tsx scripts/seed-paimana-real.ts",
+    "seed:real": "tsx scripts/seed-paimana-real.ts",
+    "seed:synthetic": "tsx scripts/seed-projects.ts",
     "seed:predictions": "tsx scripts/seed-predictions.ts",
     "test:backend": "tsx --test tests/**/*.test.ts"
   },

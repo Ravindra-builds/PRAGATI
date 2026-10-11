@@ -27,6 +27,7 @@ interface ProjectItem {
   originalCostCr: number
   plannedDurationMonths: number
   status: string
+  isSynthetic?: boolean
   latestUpdate: {
     snapshotMonth: string
     elapsedMonths: number
@@ -331,13 +332,23 @@ export default function ProjectsDirectoryPage() {
                         className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                       >
                         {/* Project ID */}
-                        <td className="py-2.5 px-4 font-mono font-bold text-blue-700">
-                          <Link
-                            href={`/dashboard/projects/${proj.projectId}`}
-                            className="hover:underline"
-                          >
-                            {proj.projectId}
-                          </Link>
+                        <td className="py-2.5 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <Link
+                              href={`/dashboard/projects/${proj.projectId}`}
+                              className="hover:underline"
+                            >
+                              {proj.projectId}
+                            </Link>
+                            {proj.isSynthetic === false && (
+                              <span
+                                className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                title="Official MoSPI PAIMANA Asset"
+                              >
+                                PAIMANA
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Title & Agency */}

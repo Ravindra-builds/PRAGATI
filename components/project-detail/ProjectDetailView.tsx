@@ -310,8 +310,14 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                 {project.sector}
               </span>
               <RiskBadge level={overallRisk} size="sm" />
-              <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 tracking-wider">
-                Synthetic Demo Data
+              <span
+                className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border tracking-wider ${
+                  project.isSynthetic
+                    ? 'bg-slate-100 text-slate-600 border-slate-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold'
+                }`}
+              >
+                {project.isSynthetic ? 'Synthetic Demo Data' : 'Official MoSPI PAIMANA Asset'}
               </span>
             </div>
 

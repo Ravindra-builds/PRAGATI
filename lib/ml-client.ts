@@ -22,7 +22,7 @@ export const PredictPayloadSchema = z.object({
   planned_duration_months: z.number().int().positive(),
   elapsed_months: z.number().int().positive(),
   physical_progress_pct: z.number().min(0).max(100),
-  financial_progress_pct: z.number().min(0).max(100),
+  financial_progress_pct: z.number().min(0).max(250),
   expenditure_cr: z.number().min(0),
   milestones_total: z.number().int().positive(),
   milestones_delayed: z.number().int().min(0),

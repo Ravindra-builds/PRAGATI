@@ -321,7 +321,7 @@ describe('PRAGATI Data Lab - 5. ML Inference & Explainability Integration', () =
     assert.strictEqual(pred.projectId, 'PRJ-TEST-PREDICT-01')
     assert.ok(pred.costOverrunProbability >= 0 && pred.costOverrunProbability <= 1.0)
     assert.ok(pred.timeOverrunProbability >= 0 && pred.timeOverrunProbability <= 1.0)
-    assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(pred.overallRiskLevel))
+    assert.ok(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(pred.overallRiskLevel))
     assert.ok(Array.isArray(pred.costDrivers))
     assert.ok(Array.isArray(pred.timeDrivers))
     assert.ok(Array.isArray(pred.earlyWarnings))

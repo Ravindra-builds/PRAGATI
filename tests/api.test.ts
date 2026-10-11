@@ -113,16 +113,16 @@ describe('1. ML Client & Response Boundary Validation', () => {
     )
   })
 
-  test('predictOverrun throws MLServiceUnavailableError when network connection fails', async () => {
+  test('predictOverrun falls back gracefully to embedded local engine when network connection fails', async () => {
     global.fetch = async () => {
       throw new Error('connect ECONNREFUSED 127.0.0.1:8000')
     }
 
     const client = new MLClient('http://mock-ml:8000')
-    await assert.rejects(
-      async () => client.predictOverrun(samplePayload),
-      (err: Error) => err instanceof MLServiceUnavailableError
-    )
+    const res = await client.predictOverrun(samplePayload)
+    assert.ok(res.cost_overrun.probability >= 0 && res.cost_overrun.probability <= 1)
+    assert.ok(res.time_overrun.probability >= 0 && res.time_overrun.probability <= 1)
+    assert.strictEqual(res.project_id, samplePayload.project_id)
   })
 })
 

@@ -47,8 +47,9 @@ export function IndiaStateMap({
     let mCount = 1
     let mCost = 1
     for (const item of items) {
+      const cost = item.totalSanctionedCostCr ?? (item as any).totalCostCr ?? 0
       if (item.totalProjects > mCount) mCount = item.totalProjects
-      if (item.totalSanctionedCostCr > mCost) mCost = item.totalSanctionedCostCr
+      if (cost > mCost) mCost = cost
     }
     return { maxCount: mCount, maxCost: mCost }
   }, [stateData])
@@ -74,7 +75,9 @@ export function IndiaStateMap({
 
     if (metricMode === 'risk') {
       // ML Early-Warning Risk Tier proportion
-      const criticalOrHigh = data.critical + data.high
+      const criticalCount = data.critical ?? (data as any).criticalProjects ?? 0
+      const highCount = data.high ?? (data as any).highRiskProjects ?? 0
+      const criticalOrHigh = criticalCount + highCount
       const riskRatio = data.totalProjects > 0 ? criticalOrHigh / data.totalProjects : 0
       if (riskRatio < 0.3) {
         return '#86efac' // Low risk: emerald-300
@@ -88,7 +91,8 @@ export function IndiaStateMap({
     }
 
     // metricMode === 'cost' (Capital Investment in ₹ Cr)
-    const costRatio = Math.min(1, data.totalSanctionedCostCr / maxCost)
+    const cost = data.totalSanctionedCostCr ?? (data as any).totalCostCr ?? 0
+    const costRatio = Math.min(1, cost / maxCost)
     // From Ice Blue (#e0f2fe: 224, 242, 254) to Deep Indigo (#1e3a8a: 30, 58, 138)
     return interpolateColor([224, 242, 254], [30, 58, 138], costRatio)
   }
@@ -231,16 +235,18 @@ export function IndiaStateMap({
                 <div className="flex justify-between gap-2">
                   <span className="text-slate-400">Sanctioned:</span>
                   <span className="font-mono font-semibold text-white">
-                    ₹{activeHoveredData.totalSanctionedCostCr.toLocaleString('en-IN')} Cr
+                    ₹{(activeHoveredData.totalSanctionedCostCr ?? (activeHoveredData as any).totalCostCr ?? 0).toLocaleString('en-IN')} Cr
                   </span>
                 </div>
                 <div className="flex justify-between gap-2">
                   <span className="text-slate-400">High / Critical Risk:</span>
                   <span className="font-mono font-semibold text-rose-400">
-                    {activeHoveredData.critical + activeHoveredData.high} (
+                    {((activeHoveredData.critical ?? (activeHoveredData as any).criticalProjects ?? 0) +
+                      (activeHoveredData.high ?? (activeHoveredData as any).highRiskProjects ?? 0))} (
                     {Math.round(
-                      ((activeHoveredData.critical + activeHoveredData.high) /
-                        activeHoveredData.totalProjects) *
+                      (((activeHoveredData.critical ?? (activeHoveredData as any).criticalProjects ?? 0) +
+                        (activeHoveredData.high ?? (activeHoveredData as any).highRiskProjects ?? 0)) /
+                        (activeHoveredData.totalProjects || 1)) *
                         100
                     )}
                     %)
