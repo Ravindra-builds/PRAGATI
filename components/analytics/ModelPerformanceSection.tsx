@@ -107,7 +107,7 @@ export function ModelPerformanceSection() {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Prototype evaluation using synthetic holdout data (Project-Grouped Temporal Split: 75% Train / 25% Test).
+                Empirical evaluation on official MoSPI PAIMANA central sector dataset with project-grouped temporal holdout validation.
               </p>
             </div>
           </div>

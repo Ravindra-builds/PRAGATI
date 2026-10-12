@@ -29,6 +29,7 @@ interface ProjectDetailData {
   originalCostCr: number
   plannedDurationMonths: number
   status: string
+  isSynthetic?: boolean
   updates: Array<{
     id: string
     projectId: string

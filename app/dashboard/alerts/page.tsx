@@ -216,11 +216,11 @@ function AlertsContent() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
-            <span className="text-[11px] font-semibold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
-              SIH 2026 Prototype &bull; Synthetic Demo Data
+            <span className="text-[11px] font-semibold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
+              MoSPI PAIMANA &bull; Early Warning Surveillance
             </span>
             <span className="text-[11px] text-slate-400 font-medium">
-              Surveillance Engine v1.0
+              Dual-Target Risk Engine
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">

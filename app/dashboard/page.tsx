@@ -74,6 +74,7 @@ interface DashboardSummaryData {
     sectors: string[]
     states: string[]
   }
+  isOfficialCohort?: boolean
 }
 
 export default function DashboardPage() {
@@ -138,9 +139,16 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               Infrastructure Portfolio Overview
             </h1>
-            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 tracking-wider">
-              Synthetic Demo Data
-            </span>
+            {data?.isOfficialCohort ? (
+              <span className="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300 tracking-wider flex items-center gap-1.5 shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Official MoSPI PAIMANA Assets
+              </span>
+            ) : (
+              <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 tracking-wider">
+                Synthetic Demo Data
+              </span>
+            )}
           </div>
           <p className="mt-1 text-xs sm:text-sm text-slate-500">
             Real-time project health, dual-target risk distribution, and early warning intelligence.

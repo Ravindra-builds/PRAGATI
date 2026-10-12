@@ -208,7 +208,7 @@ export class ContextBuilder {
         ?.highPriorityProjects ||
       []
 
-    const highPriorityProjects = rawProjects.slice(0, 8).map((p) => {
+    const highPriorityProjects = rawProjects.slice(0, 8).map((p: any) => {
       const burnGap = p.latestUpdate
         ? p.latestUpdate.financialProgressPct - p.latestUpdate.physicalProgressPct
         : 0

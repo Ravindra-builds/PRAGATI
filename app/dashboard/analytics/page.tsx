@@ -13,6 +13,7 @@ import { ModelRiskDistributions } from '@/components/analytics/ModelRiskDistribu
 import { PortfolioRiskTrend } from '@/components/analytics/PortfolioRiskTrend'
 import { ProjectComparisonTool } from '@/components/analytics/ProjectComparisonTool'
 import { ModelPerformanceSection } from '@/components/analytics/ModelPerformanceSection'
+import { EmpiricalValidationSection } from '@/components/analytics/EmpiricalValidationSection'
 import { AnalyticsPayload } from '@/lib/services/synthetic-dataset'
 import { AlertTriangle } from 'lucide-react'
 
@@ -171,7 +172,12 @@ function AnalyticsContent() {
           {/* H. Side-by-Side Project Comparison Tool */}
           <ProjectComparisonTool projectList={data.projectList} />
 
-          {/* I. Task 4 Model Validation Metrics & Transparency Notice */}
+          {/* I. Option 1 Empirical Ground-Truth Backtesting Benchmark */}
+          {data.backtestingValidation && (
+            <EmpiricalValidationSection validation={data.backtestingValidation} />
+          )}
+
+          {/* J. Task 4 Model Validation Metrics & Transparency Notice */}
           <ModelPerformanceSection />
         </div>
       )}
